@@ -5,3 +5,8 @@ torch
 transformers
 indic-nlp-library
 numpy
+easyocr
+Pillow
+requests
+python-multipart
+pytesseract

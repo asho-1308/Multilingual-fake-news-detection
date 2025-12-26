@@ -65,3 +65,53 @@ export async function checkBulkNews(texts: string[]): Promise<PredictionResult[]
         return { status: "error", message: "Failed to connect to the prediction server." };
     }
 }
+
+/**
+ * Uploads an image file to the server for OCR + prediction.
+ */
+export async function checkImageUpload(file: File): Promise<PredictionResult | ApiError> {
+    try {
+        const form = new FormData();
+        form.append('file', file);
+
+        const response = await fetch(`${API_BASE_URL}/predict_image_upload`, {
+            method: 'POST',
+            body: form,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            return { status: "error", message: data.detail || `Server error: ${response.statusText}` };
+        }
+
+        return data as PredictionResult;
+    } catch (error) {
+        console.error("API Error (image upload):", error);
+        return { status: "error", message: "Failed to connect to the prediction server." };
+    }
+}
+
+/**
+ * Sends an image URL to the server for OCR + prediction.
+ */
+export async function checkImageURL(url: string): Promise<PredictionResult | ApiError> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/predict_image_url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            return { status: "error", message: data.detail || `Server error: ${response.statusText}` };
+        }
+
+        return data as PredictionResult;
+    } catch (error) {
+        console.error("API Error (image url):", error);
+        return { status: "error", message: "Failed to connect to the prediction server." };
+    }
+}

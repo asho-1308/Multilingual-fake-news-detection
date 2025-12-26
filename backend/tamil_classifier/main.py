@@ -1,188 +1,234 @@
 import uvicorn
 import re
+import io
+import os
+import shutil
+import requests
 import torch
-from fastapi import FastAPI, HTTPException
+import numpy as np
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from transformers import pipeline
 from indicnlp import common
 from indicnlp.normalize.indic_normalize import IndicNormalizerFactory
 from contextlib import asynccontextmanager
 from typing import List
+from PIL import Image
 
 # --- CONFIGURATION ---
 PORT = 1000
-MODEL_PATH = "./my_tamil_fake_news_model"  # Path to your downloaded model
-INDIC_RESOURCES_PATH = "./indic_nlp_resources" # Path to the cloned repo
+MODEL_PATH = "./my_tamil_fake_news_model"
+INDIC_RESOURCES_PATH = "./indic_nlp_resources"
+OCR_MODEL_DIR = "./ocr_models"
 
-# --- GLOBAL VARIABLES FOR MODEL ---
+# Tesseract Configuration (Windows Path)
+# If you don't have Tesseract installed, download it from: https://github.com/UB-Mannheim/tesseract/wiki
+TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+# --- GLOBAL VARIABLES ---
 classifier = None
 normalizer = None
+ocr_reader = None
+use_tesseract = False
 
-def load_model_and_resources():
-    global classifier, normalizer
+# --- NUCLEAR CACHE CLEANER ---
+def clean_corrupted_easyocr_cache():
+    """Deletes EasyOCR cache from both local and user directories."""
+    paths_to_clean = [
+        OCR_MODEL_DIR,
+        os.path.join(os.path.expanduser("~"), ".EasyOCR") # Checks C:\Users\LENOVO\.EasyOCR
+    ]
     
+    print("--- CHECKING FOR CORRUPTED OCR MODELS ---")
+    for path in paths_to_clean:
+        if os.path.exists(path):
+            try:
+                print(f"Deleting cached models in: {path}")
+                shutil.rmtree(path)
+                print("Deleted successfully.")
+            except Exception as e:
+                print(f"Warning: Could not delete {path}. Reason: {e}")
+    print("-------------------------------------------")
+
+# --- LOAD RESOURCES ---
+def load_model_and_resources():
+    global classifier, normalizer, ocr_reader, use_tesseract
+    
+    # 1. Clean Cache to prevent "size mismatch" errors
+    clean_corrupted_easyocr_cache()
+
+    # 2. Load NLP Resources
     print("Loading Indic NLP Resources...")
     try:
         common.set_resources_path(INDIC_RESOURCES_PATH)
         factory = IndicNormalizerFactory()
-        normalizer = factory.get_normalizer("ta") # Tamil Normalizer
-    except Exception as e:
-        print(f"Error loading Indic NLP resources: {e}")
-        print("Ensure you have cloned https://github.com/anoopkunchukuttan/indic_nlp_resources.git into the project folder.")
-        raise e
+        normalizer = factory.get_normalizer("ta")
+    except Exception:
+        print("Warning: Indic NLP not found. Normalization disabled.")
 
+    # 3. Load Classification Model
     print(f"Loading Model from {MODEL_PATH}...")
     try:
-        # Load Model and Tokenizer into a pipeline
-        device = 0 if torch.cuda.is_available() else -1
+        device = -1 # Force CPU to avoid CUDA warnings if unstable
+        if torch.cuda.is_available():
+            device = 0
+            
         classifier = pipeline(
             "text-classification",
             model=MODEL_PATH,
             tokenizer=MODEL_PATH,
             device=device
         )
-        if device == 0:
-            print("Model loaded on GPU.")
-        else:
-            print("Model loaded on CPU.")
-            
+        print("Fake News Model Loaded Successfully.")
     except Exception as e:
-        print(f"Error loading model: {e}")
-        print("Ensure you have downloaded the model folder from Google Drive.")
+        print(f"CRITICAL ERROR: Could not load model. {e}")
         raise e
+
+    # 4. Initialize EasyOCR (with Tesseract Fallback)
+    print("Initializing EasyOCR...")
+    try:
+        import easyocr
+        # Force fresh download to local folder
+        if not os.path.exists(OCR_MODEL_DIR):
+            os.makedirs(OCR_MODEL_DIR)
+            
+        ocr_reader = easyocr.Reader(
+            ['ta', 'en'], 
+            gpu=torch.cuda.is_available(),
+            model_storage_directory=OCR_MODEL_DIR,
+            download_enabled=True
+        )
+        print("EasyOCR Initialized Successfully.")
+    except Exception as e:
+        print(f"EasyOCR Failed to Init: {e}")
+        print("Switching to Tesseract Fallback...")
+        ocr_reader = None
+
+    # 5. Initialize Tesseract
+    try:
+        import pytesseract
+        if os.path.exists(TESSERACT_PATH):
+            pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+            use_tesseract = True
+            print(f"Tesseract configured at: {TESSERACT_PATH}")
+        else:
+            print("Tesseract executable not found. Image analysis might fail if EasyOCR also fails.")
+    except ImportError:
+        print("pytesseract library not installed. Run 'pip install pytesseract'")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load the ML model
     load_model_and_resources()
     yield
-    # Clean up the ML models and release the resources
-    # (if needed)
 
+# --- APP SETUP ---
 from fastapi.middleware.cors import CORSMiddleware
+app = FastAPI(title="Tamil Fake News Detector", lifespan=lifespan)
 
-# --- APP INITIALIZATION ---
-app = FastAPI(title="Tamil Fake News Detector API", lifespan=lifespan)
-
-# --- CORS MIDDLEWARE ---
-# This allows the frontend (running on a different port) to communicate with the backend.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# --- PREPROCESSING HELPER (Must match Notebook exactly) ---
+# --- LOGIC ---
 def clean_text(text: str):
-    if not isinstance(text, str):
-        text = str(text)
-    # Remove URLs
+    if not isinstance(text, str): text = str(text)
     text = re.sub(r'http\S+|www\S+|https\S+', '', text)
-    # Remove non-Tamil characters (keeping punctuation)
     text = re.sub(r'[^\u0B80-\u0BFF\s.,!?]', '', text)
-    # Normalize
-    return normalizer.normalize(text.strip()) if text.strip() else ""
+    if normalizer:
+        return normalizer.normalize(text.strip()) if text.strip() else ""
+    return text.strip()
 
-# --- API DATA MODELS ---
-class NewsRequest(BaseModel):
-    text: str
+def perform_ocr(image):
+    """Robust OCR that tries EasyOCR first, then Tesseract."""
+    text = ""
+    
+    # Try EasyOCR
+    if ocr_reader:
+        try:
+            results = ocr_reader.readtext(np.array(image))
+            text = " ".join([res[1] for res in results])
+        except Exception as e:
+            print(f"EasyOCR Runtime Error: {e}")
+    
+    # If EasyOCR failed or returned nothing, try Tesseract
+    if not text.strip() and use_tesseract:
+        try:
+            import pytesseract
+            text = pytesseract.image_to_string(image, lang='tam+eng')
+        except Exception as e:
+            print(f"Tesseract Runtime Error: {e}")
+            
+    return text
 
-class NewsListRequest(BaseModel):
-    texts: List[str]
+def predict_from_text(text: str):
+    cleaned = clean_text(text)
+    if not cleaned or not re.search(r'[\u0B80-\u0BFF]', cleaned):
+         raise HTTPException(status_code=400, detail="Could not extract valid Tamil text from image.")
+         
+    result = classifier(cleaned)[0]
+    is_fake = (result['label'] == 'LABEL_1')
+    return {
+        "original_text": text,
+        "prediction": "Fake" if is_fake else "Real",
+        "confidence": round(result['score'], 4),
+        "cleaned_text": cleaned
+    }
 
-class PredictionResponse(BaseModel):
-    original_text: str
-    cleaned_text: str
-    prediction: str
-    confidence: float
-    is_fake: bool
+# --- ENDPOINTS ---
+@app.post("/predict")
+async def predict_news(item: dict):
+    return predict_from_text(item.get("text", ""))
 
-# --- API ENDPOINTS ---
-@app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-async def predict_news(news: NewsRequest):
-    if not classifier:
-        raise HTTPException(status_code=503, detail="Model not loaded yet.")
+@app.post("/predict_bulk")
+async def predict_bulk(item: dict):
+    texts = item.get("texts", [])
+    results = []
+    for t in texts:
+        try:
+            results.append(predict_from_text(t))
+        except:
+            continue
+    return results
 
+@app.post("/predict_image_upload")
+async def predict_image_upload(file: UploadFile = File(...)):
     try:
-        # 1. Preprocess
-        cleaned_text = clean_text(news.text)
+        content = await file.read()
+        image = Image.open(io.BytesIO(content)).convert('RGB')
         
-        if not cleaned_text or not re.search(r'[\u0B80-\u0BFF]', cleaned_text):
-            raise HTTPException(status_code=400, detail="Input text contains no valid Tamil characters after cleaning.")
-
-        # 2. Predict using the pipeline
-        result = classifier(cleaned_text)[0]
+        extracted_text = perform_ocr(image)
         
-        # 3. Map Labels (Based on your notebook: LABEL_0 = Real, LABEL_1 = Fake)
-        label = result['label']
-        confidence = result['score']
+        if not extracted_text.strip():
+            raise HTTPException(status_code=400, detail="No text found in image. Try a clearer image.")
+            
+        return predict_from_text(extracted_text)
         
-        prediction_label = "Real" if label == 'LABEL_0' else "Fake"
-        is_fake_bool = (label == 'LABEL_1')
-
-        return PredictionResponse(
-            original_text=news.text,
-            cleaned_text=cleaned_text,
-            prediction=prediction_label,
-            confidence=round(confidence, 4),
-            is_fake=is_fake_bool
-        )
-    
-    except HTTPException:
-        raise
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+        # Print the ACTUAL error to console
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
 
-@app.post("/predict_bulk", response_model=List[PredictionResponse], tags=["Prediction"])
-async def predict_news_bulk(news_list: NewsListRequest):
-    if not classifier:
-        raise HTTPException(status_code=503, detail="Model not loaded yet.")
-
-    responses = []
-    
-    # Clean all texts first
-    cleaned_texts = [clean_text(text) for text in news_list.texts]
-    
-    # Filter out empty texts to avoid sending them to the model
-    valid_texts = [text for text in cleaned_texts if text and re.search(r'[\u0B80-\u0BFF]', text)]
-    
-    if not valid_texts:
-        raise HTTPException(status_code=400, detail="None of the input texts contain valid Tamil characters after cleaning.")
-
+@app.post("/predict_image_url")
+async def predict_image_url(item: dict):
     try:
-        # Predict in a batch
-        bulk_results = classifier(valid_texts)
-
-        # Create a map of cleaned text to its original text
-        original_text_map = {cleaned: original for original, cleaned in zip(news_list.texts, cleaned_texts) if cleaned in valid_texts}
+        resp = requests.get(item['url'], timeout=10)
+        image = Image.open(io.BytesIO(resp.content)).convert('RGB')
         
-        # Process results
-        for i, result in enumerate(bulk_results):
-            cleaned_text = valid_texts[i]
-            original_text = original_text_map[cleaned_text]
-            
-            label = result['label']
-            confidence = result['score']
-            
-            prediction_label = "Real" if label == 'LABEL_0' else "Fake"
-            is_fake_bool = (label == 'LABEL_1')
-
-            responses.append(PredictionResponse(
-                original_text=original_text,
-                cleaned_text=cleaned_text,
-                prediction=prediction_label,
-                confidence=round(confidence, 4),
-                is_fake=is_fake_bool
-            ))
-            
-        return responses
-
+        extracted_text = perform_ocr(image)
+        
+        if not extracted_text.strip():
+             raise HTTPException(status_code=400, detail="No text found in image.")
+             
+        return predict_from_text(extracted_text)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during bulk prediction: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
-# --- ENTRY POINT ---
 if __name__ == "__main__":
-    # Run uvicorn server on port 1000
     uvicorn.run(app, host="0.0.0.0", port=PORT)
