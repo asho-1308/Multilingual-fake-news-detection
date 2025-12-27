@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  tamil-classifier:
+    build:
+      context: ./backend/tamil_classifier
+      dockerfile: Dockerfile
+    container_name: tamil-classifier-service
+    ports:
+      - "1000:1000"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=1000
+      - USE_CUDA=false  # Set to true if GPU available
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./backend/tamil_classifier/final_trained_model:/app/final_trained_model
+      - ./backend/tamil_classifier/logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - fake-news-detection
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  fake-news-detection:
+    driver: bridge

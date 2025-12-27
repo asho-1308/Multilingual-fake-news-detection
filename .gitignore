@@ -6,6 +6,11 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+data/*.csv
+backend/tamil_classifier/my_tamil_fake_news_model/
+backend/tamil_classifier/ocr_models/*.pth
+backend/tamil_classifier/indic_nlp_resources/
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
