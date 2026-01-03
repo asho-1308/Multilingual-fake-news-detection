@@ -31,5 +31,5 @@ MAX_CANDIDATES = int(os.getenv("MAX_CANDIDATES", str(TOP_K * 5)))
 
 # Server config
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "5001"))
+PORT = int(os.getenv("PORT", "3000"))
 DEBUG = os.getenv("DEBUG", "true").lower() == "true"

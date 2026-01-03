@@ -1,20 +1,7 @@
-# Use official Python runtime as a parent image
-FROM python:3.10-slim
+# Use the common base image
+FROM multilingual-fake-news-detection-base:latest
 
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements
-COPY requirements.txt .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# All dependencies are already installed in the base image
 
 # Copy application code
 COPY . .
@@ -27,4 +14,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:1000/health || exit 1
 
 # Run the application
-CMD ["python", "app.py"]
+CMD ["python", "main.py"]
