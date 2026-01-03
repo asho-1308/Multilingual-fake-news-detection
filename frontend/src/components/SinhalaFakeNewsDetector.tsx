@@ -23,8 +23,7 @@ const SinhalaFakeNewsDetector = () => {
     setError("");
 
     try {
-      // Assuming sinhala classifier runs on port 8000
-      const response = await fetch("http://localhost:8000/predict", {
+      const response = await fetch("http://localhost:2000/predict", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

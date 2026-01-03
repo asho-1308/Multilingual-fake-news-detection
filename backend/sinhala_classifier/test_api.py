@@ -1,6 +1,6 @@
 import requests
 
-url = "http://localhost:8000/predict"
+url = "http://localhost:2000/predict"
 
 samples = [
     "ආණ්ඩුව නව බදු පනත් හඳුන්වා දීමට තීරණය කර ඇත",
