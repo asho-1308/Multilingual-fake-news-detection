@@ -25,6 +25,9 @@ const SemanticSimilarityMatcher = () => {
   const [result, setResult] = useState<SimilarityResult | null>(null);
   const [error, setError] = useState("");
 
+  // Support both backend response shapes: `neighbors` (new) and `similar_sources` (legacy)
+  const matches = result ? ((result as any).neighbors ?? (result as any).similar_sources ?? []) : [];
+
   const handleSimilarityCheck = async () => {
     if (!claim.trim()) return;
 
@@ -33,7 +36,7 @@ const SemanticSimilarityMatcher = () => {
 
     try {
       // Assuming similarity matcher runs on port 5001
-      const response = await fetch("http://localhost:5001/api/verify", {
+      const response = await fetch("http://localhost:3000/api/verify", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -124,35 +127,44 @@ const SemanticSimilarityMatcher = () => {
           <CardHeader>
             <CardTitle>Similarity Results</CardTitle>
             <CardDescription>
-              Top {result.top_k} similar sources found
+              Top {((result as any).top_k ?? matches.length)} similar sources found{( (result as any).detected_language ? ` — Detected: ${(result as any).detected_language}` : '')}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {result.similar_sources.map((source, index) => (
-                <div key={index} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-semibold text-sm">{source.source}</h4>
-                    <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-                      {(source.similarity_score * 100).toFixed(2)}% similar
-                    </span>
-                  </div>
-                  {source.title && (
-                    <p className="text-sm text-gray-600 mb-2">{source.title}</p>
-                  )}
-                  {source.url && (
-                    <a
-                      href={source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                    >
-                      View Source <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
+            {matches && matches.length > 0 ? (
+              <div className="space-y-4">
+                {matches.map((source: any, index: number) => {
+                  const similarity = source.similarity ?? source.similarity_score ?? 0;
+                  const title = source.title ?? source.claim;
+                  return (
+                    <div key={index} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-semibold text-sm">{source.source}</h4>
+                        <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                          {(similarity * 100).toFixed(2)}% similar
+                        </span>
+                      </div>
+
+                      {source.verdict && <p className="text-sm mb-1"><strong>Verdict:</strong> {source.verdict}</p>}
+                      {title && <p className="text-sm text-gray-600 mb-2">{title}</p>}
+
+                      {source.url && (
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                        >
+                          View Source <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-4 text-sm text-gray-600">No matches found.</div>
+            )}
           </CardContent>
         </Card>
       )}
