@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from schemas import PredictionRequest, PredictionResponse
-from model_loader import predict_news
+from .schemas import PredictionRequest, PredictionResponse
+from .model_loader import predict_news
 
 app = FastAPI(title="Sinhala Fake News Detection ML Service")
 

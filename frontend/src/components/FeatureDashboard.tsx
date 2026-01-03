@@ -3,13 +3,10 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import NewsVerifier from "./NewsVerifier";
-import ImageVerifier from "./ImageVerifier";
-import CommunityReporting from "./CommunityReporting";
-import PersonalFeed from "./PersonalFeed";
-import EducationalMode from "./EducationalMode";
-import EmergencyAlerts from "./EmergencyAlerts";
-import BrowserExtensionSimulator from "./BrowserExtensionSimulator";
+import TamilFakeNewsDetector from "./TamilFakeNewsDetector";
+import SinhalaFakeNewsDetector from "./SinhalaFakeNewsDetector";
+import SemanticSimilarityMatcher from "./SemanticSimilarityMatcher";
+import SourceCredibilityPredictor from "./SourceCredibilityPredictor";
 import { 
   FileText, 
   Image, 
@@ -18,73 +15,56 @@ import {
   AlertTriangle, 
   Globe, 
   Bookmark,
-  BarChart3
+  BarChart3,
+  Languages,
+  CheckCircle,
+  Search,
+  Shield
 } from "lucide-react";
 
 const FeatureDashboard = () => {
-  const [activeTab, setActiveTab] = useState("text-verify");
+  const [activeTab, setActiveTab] = useState("tamil-detection");
 
   const features = [
     {
-      id: "text-verify",
-      label: "Text Verification",
-      icon: FileText,
-      component: <NewsVerifier />,
-      description: "Advanced AI-powered text fact-checking with sentiment analysis"
+      id: "tamil-detection",
+      label: "Tamil Fake News",
+      icon: Languages,
+      component: <TamilFakeNewsDetector />,
+      description: "Detect fake news in Tamil language (text or image input)"
     },
     {
-      id: "media-verify", 
-      label: "Media Verification",
-      icon: Image,
-      component: <ImageVerifier />,
-      description: "Deepfake detection and reverse image search"
+      id: "sinhala-detection", 
+      label: "Sinhala Fake News",
+      icon: Languages,
+      component: <SinhalaFakeNewsDetector />,
+      description: "Detect fake news in Sinhala language (text input)"
     },
     {
-      id: "community",
-      label: "Community Reports",
-      icon: Users,
-      component: <CommunityReporting />,
-      description: "Crowdsourced misinformation reporting and tracking"
+      id: "similarity-matching",
+      label: "Similarity Matching",
+      icon: Search,
+      component: <SemanticSimilarityMatcher />,
+      description: "Check semantic similarity with verified sources"
     },
     {
-      id: "personal",
-      label: "Personal Feed", 
-      icon: Bookmark,
-      component: <PersonalFeed />,
-      description: "Your saved articles and fact-check history"
-    },
-    {
-      id: "education",
-      label: "Learn Mode",
-      icon: BookOpen,
-      component: <EducationalMode />,
-      description: "Interactive lessons to identify fake news"
-    },
-    {
-      id: "emergency",
-      label: "Emergency Alerts",
-      icon: AlertTriangle,
-      component: <EmergencyAlerts />,
-      description: "Real-time crisis information verification"
-    },
-    {
-      id: "extension",
-      label: "Quick Checker",
-      icon: Globe,
-      component: <BrowserExtensionSimulator />,
-      description: "Instant website credibility checking"
+      id: "credibility-predictor",
+      label: "Source Credibility",
+      icon: Shield,
+      component: <SourceCredibilityPredictor />,
+      description: "Predict credibility of news sources"
     }
   ];
 
   return (
     <div className="w-full max-w-7xl mx-auto">
       <div className="mb-6">
-        <h2 className="text-3xl font-bold mb-2">Truth Seeker Professional</h2>
-        <p className="text-gray-600">Comprehensive AI-powered misinformation detection and verification platform</p>
+        <h2 className="text-3xl font-bold mb-2">Multilingual Fake News Detection</h2>
+        <p className="text-gray-600">AI-powered fake news detection for Tamil, Sinhala, and multilingual content</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-4 lg:grid-cols-7 mb-6">
+        <TabsList className="grid grid-cols-2 lg:grid-cols-4 mb-6">
           {features.map((feature) => (
             <TabsTrigger 
               key={feature.id} 
@@ -118,31 +98,39 @@ const FeatureDashboard = () => {
       </Tabs>
 
       <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">🚀 Professional Features Available</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+        <h3 className="text-lg font-semibold mb-2">🚀 Core Features</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-blue-500" />
-            <span>Advanced Analytics Dashboard</span>
+            <Languages className="h-4 w-4 text-blue-500" />
+            <span>Tamil Language Support</span>
           </div>
           <div className="flex items-center gap-2">
-            <Globe className="h-4 w-4 text-green-500" />
-            <span>Browser Extension Integration</span>
+            <Languages className="h-4 w-4 text-green-500" />
+            <span>Sinhala Language Support</span>
           </div>
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-purple-500" />
-            <span>WhatsApp/Telegram Bot</span>
+            <Image className="h-4 w-4 text-purple-500" />
+            <span>Image Input Support</span>
           </div>
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-            <span>Real-time Monitoring</span>
+            <Search className="h-4 w-4 text-red-500" />
+            <span>Semantic Similarity</span>
           </div>
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-orange-500" />
-            <span>API Access</span>
+            <Shield className="h-4 w-4 text-orange-500" />
+            <span>Source Credibility</span>
           </div>
           <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-teal-500" />
-            <span>Educational Resources</span>
+            <CheckCircle className="h-4 w-4 text-teal-500" />
+            <span>Real-time Detection</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-pink-500" />
+            <span>Confidence Scores</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-indigo-500" />
+            <span>Multilingual Support</span>
           </div>
         </div>
       </div>

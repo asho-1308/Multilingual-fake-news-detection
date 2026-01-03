@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sinhala-classifier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sinhala-classifier
+  template:
+    metadata:
+      labels:
+        app: sinhala-classifier
+    spec:
+      containers:
+      - name: sinhala-classifier
+        image: sinhala-classifier:latest
+        ports:
+        - containerPort: 2000
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 2000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 2000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sinhala-classifier-service
+spec:
+  selector:
+    app: sinhala-classifier
+  ports:
+  - port: 2000
+    targetPort: 2000
+  type: ClusterIP

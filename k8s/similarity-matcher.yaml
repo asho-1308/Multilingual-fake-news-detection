@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: similarity-matcher
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: similarity-matcher
+  template:
+    metadata:
+      labels:
+        app: similarity-matcher
+    spec:
+      containers:
+      - name: similarity-matcher
+        image: similarity-matcher:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        volumeMounts:
+        - name: artifacts
+          mountPath: /app/artifacts
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: artifacts
+        hostPath:
+          path: /path/to/artifacts  # Update this path
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: similarity-matcher-service
+spec:
+  selector:
+    app: similarity-matcher
+  ports:
+  - port: 3000
+    targetPort: 3000
+  type: ClusterIP

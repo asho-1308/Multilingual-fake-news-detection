@@ -6,12 +6,12 @@ FROM multilingual-fake-news-detection-base:latest
 # Copy application code
 COPY . .
 
-# Expose port 1000
-EXPOSE 1000
+# Expose port 3000
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:1000/health || exit 1
+    CMD curl -f http://localhost:3000/health || exit 1
 
 # Run the application
-CMD ["python", "main.py"]
+CMD ["python", "app.py"]
