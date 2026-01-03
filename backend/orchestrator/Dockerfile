@@ -1,17 +1,18 @@
 # Use the common base image
 FROM multilingual-fake-news-detection-base:latest
 
-# All dependencies are already installed in the base image
+# Install additional dependencies specific to orchestrator
+RUN pip install --no-cache-dir langdetect==1.0.9
 
 # Copy application code
 COPY . .
 
-# Expose port 1000
-EXPOSE 1000
+# Expose port 5000
+EXPOSE 5000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:1000/health || exit 1
+    CMD curl -f http://localhost:5000/health || exit 1
 
 # Run the application
-CMD ["python", "main.py"]
+CMD ["python", "app.py"]

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   tamil-classifier:
     build:
@@ -20,6 +18,109 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:1000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - fake-news-detection
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  sinhala-classifier:
+    build:
+      context: ./backend/sinhala_classifier
+      dockerfile: Dockerfile
+    container_name: sinhala-classifier-service
+    ports:
+      - "2000:2000"
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - fake-news-detection
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  similarity-matcher:
+    build:
+      context: ./backend/similarity_matcher
+      dockerfile: Dockerfile
+    container_name: similarity-matcher-service
+    ports:
+      - "3000:3000"
+    environment:
+      - FLASK_ENV=production
+    volumes:
+      - ./backend/similarity_matcher/artifacts:/app/artifacts
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - fake-news-detection
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  credibility-predictor:
+    build:
+      context: ./backend/credibility_predictor
+      dockerfile: Dockerfile
+    container_name: credibility-predictor-service
+    ports:
+      - "4000:4000"
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - fake-news-detection
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  orchestrator:
+    build:
+      context: ./backend/orchestrator
+      dockerfile: Dockerfile
+    container_name: orchestrator-service
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+    depends_on:
+      - tamil-classifier
+      - sinhala-classifier
+      - similarity-matcher
+      - credibility-predictor
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
