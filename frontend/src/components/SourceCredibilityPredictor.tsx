@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Shield, Loader2 } from "lucide-react";
 
 interface CredibilityResult {
@@ -150,14 +151,15 @@ const SourceCredibilityPredictor = () => {
             </div>
             <div>
               <Label htmlFor="language">Language</Label>
-              <Input
-                id="language"
-                type="text"
-                placeholder="e.g., English"
-                value={formData.language}
-                onChange={(e) => handleInputChange("language", e.target.value)}
-                className="w-full mt-1"
-              />
+              <Select value={formData.language} onValueChange={(value) => handleInputChange("language", value)}>
+                <SelectTrigger className="w-full mt-1">
+                  <SelectValue placeholder="Select a language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Tamil">Tamil</SelectItem>
+                  <SelectItem value="Sinhala">Sinhala</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
