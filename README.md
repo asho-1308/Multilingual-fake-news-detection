@@ -1,2 +1,310 @@
-# Fake_News_Detection_Tamil_-_Sinhala
-RP
+# Multilingual Fake News Detection System
+
+A comprehensive AI-powered system for detecting fake news in Tamil and Sinhala languages. The system combines multiple specialized components to provide accurate fake news detection through text analysis, source credibility assessment, and fact-checking against verified sources.
+
+## 🏗️ Architecture Overview
+
+The system consists of microservices architecture with the following components:
+
+### Core Services (Main 4 Functions)
+
+1. **📰 Tamil Classifier** (Port 1000)
+   - **Function**: Detects fake news in Tamil language content
+   - **Features**: Text classification, OCR for Tamil images, Indic NLP normalization
+   - **Technology**: FastAPI, Transformers, EasyOCR, Indic NLP Library
+   - **Model**: Fine-tuned transformer model trained on Tamil news dataset
+
+2. **📰 Sinhala Classifier** (Port 2000)
+   - **Function**: Detects fake news in Sinhala language content
+   - **Features**: Text classification with Sinhala language processing
+   - **Technology**: FastAPI, Machine learning models
+   - **Model**: ML model trained on Sinhala news data
+
+3. **🔍 Similarity Matcher** (Port 3000)
+   - **Function**: Fact-checks claims against verified news sources using semantic similarity
+   - **Features**: Semantic search, multilingual support, FAISS indexing
+   - **Technology**: FastAPI, Sentence Transformers, FAISS
+   - **Data**: Pre-indexed verified sources in multiple languages
+
+4. **⚖️ Credibility Predictor** (Port 4000)
+   - **Function**: Assesses news source credibility based on historical data
+   - **Features**: ML-based prediction using source features
+   - **Technology**: Flask, Scikit-learn, Random Forest
+   - **Inputs**: Past fake/real counts, domain age, follower count, language
+
+### Supporting Services
+
+5. **🎯 Orchestrator** (Port 5000)
+   - **Function**: Main coordinator that routes requests based on language detection
+   - **Features**: Automatic language detection, service orchestration, result aggregation
+   - **Technology**: Flask, LangDetect
+
+6. **🖥️ Frontend** (Port 8080)
+   - **Function**: User interface for interacting with the detection system
+   - **Features**: React-based UI, real-time predictions, multi-language support
+   - **Technology**: React, Vite, TypeScript, Tailwind CSS
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Docker and Docker Compose
+- 8GB+ RAM recommended
+- Python 3.8+ (for local development)
+
+### Docker Deployment (Recommended)
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd multilingual-fake-news-detection
+   ```
+
+2. **Start all services**:
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Check service health**:
+   ```bash
+   docker-compose ps
+   ```
+
+4. **Access the application**:
+   - Frontend: http://localhost:8080
+   - API Documentation: http://localhost:5000 (Orchestrator)
+
+### Local Development Setup
+
+1. **Backend Setup**:
+   ```bash
+   # Create virtual environment
+   python -m venv .venv
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+   # Install dependencies for each service
+   cd backend/tamil_classifier && pip install -r requirements.txt
+   cd ../sinhala_classifier && pip install -r requirements.txt
+   cd ../similarity_matcher && pip install -r requirements.txt
+   cd ../credibility_predictor && pip install -r requirements.txt
+   cd ../orchestrator && pip install -r requirements.txt
+   ```
+
+2. **Frontend Setup**:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. **Start Services**:
+   ```bash
+   # Start each service in separate terminals
+   cd backend/tamil_classifier && python main.py
+   cd backend/sinhala_classifier && python app.py
+   cd backend/similarity_matcher && python app.py
+   cd backend/credibility_predictor && python app.py
+   cd backend/orchestrator && python app.py
+   ```
+
+## 📡 API Usage
+
+### Main Endpoint (Orchestrator)
+
+**URL**: `POST http://localhost:5000/predict`
+
+**Request**:
+```json
+{
+  "text": "Your news text in Tamil or Sinhala"
+}
+```
+
+**Response**:
+```json
+{
+  "language": "tamil",
+  "classifier": {
+    "status": "success",
+    "prediction": "Real",
+    "confidence": 0.89
+  },
+  "similarity": {
+    "matches": [
+      {
+        "source": "Verified News Source",
+        "similarity": 0.95,
+        "url": "https://..."
+      }
+    ]
+  },
+  "credibility": {
+    "credibility": "High",
+    "score": 85.2
+  }
+}
+```
+
+### Individual Service Endpoints
+
+#### Tamil Classifier
+- **Text**: `POST http://localhost:1000/predict`
+- **Image Upload**: `POST http://localhost:1000/predict_image_upload`
+- **Image URL**: `POST http://localhost:1000/predict_image_url`
+
+#### Sinhala Classifier
+- **Text**: `POST http://localhost:2000/predict`
+
+#### Similarity Matcher
+- **Verify Claim**: `POST http://localhost:3000/api/verify`
+
+#### Credibility Predictor
+- **Predict**: `POST http://localhost:4000/predict`
+
+## 🔧 Configuration
+
+### Environment Variables
+
+Each service can be configured via environment variables:
+
+```bash
+# Tamil Classifier
+USE_CUDA=false
+LOG_LEVEL=INFO
+
+# General
+FLASK_ENV=production
+```
+
+### Model Files
+
+Ensure model files are in place:
+- `backend/tamil_classifier/my_tamil_fake_news_model/`
+- `backend/sinhala_classifier/model/`
+- `backend/similarity_matcher/artifacts/`
+- `backend/credibility_predictor/` (credibility_rf_model.pkl, lang_encoder.pkl)
+
+## 🧪 Testing
+
+### API Testing
+
+Use the test scripts in each service directory:
+
+```bash
+# Tamil Classifier
+cd backend/tamil_classifier && python test_api.py
+
+# Sinhala Classifier
+cd backend/sinhala_classifier && python test_api.py
+```
+
+### Health Checks
+
+All services include health endpoints:
+- `GET /health` on each service port
+
+## 📊 Data Flow
+
+1. **Input**: User submits text via frontend or API
+2. **Language Detection**: Orchestrator detects language (Tamil/Sinhala/English)
+3. **Classification**: Routes to appropriate language classifier
+4. **Fact-Checking**: Similarity matcher verifies against known sources
+5. **Credibility**: Assesses source credibility if available
+6. **Aggregation**: Orchestrator combines all results
+7. **Output**: Returns comprehensive analysis
+
+## 🐳 Docker Services
+
+### Service Ports
+- Tamil Classifier: 1000
+- Sinhala Classifier: 2000
+- Similarity Matcher: 3000
+- Credibility Predictor: 4000
+- Orchestrator: 5000
+- Frontend: 8080
+
+### Docker Commands
+
+```bash
+# Start specific service
+docker-compose up tamil-classifier
+
+# View logs
+docker-compose logs tamil-classifier
+
+# Rebuild service
+docker-compose up --build tamil-classifier
+
+# Stop all
+docker-compose down
+```
+
+## 🔍 Monitoring & Logging
+
+- **Health Checks**: Automatic health monitoring every 30 seconds
+- **Logging**: JSON-formatted logs with size limits (10MB, 3 files)
+- **Restart Policy**: `unless-stopped` for automatic recovery
+
+## 🚀 Deployment
+
+### Production Deployment
+
+1. **Build production images**:
+   ```bash
+   docker-compose -f docker-compose.yml up --build
+   ```
+
+2. **Use reverse proxy** (nginx recommended):
+   ```nginx
+   server {
+       listen 80;
+       server_name your-domain.com;
+
+       location / {
+           proxy_pass http://localhost:8080;
+           proxy_set_header Host $host;
+       }
+
+       location /api {
+           proxy_pass http://localhost:5000;
+           proxy_set_header Host $host;
+       }
+   }
+   ```
+
+3. **SSL Configuration**: Use certbot or similar for HTTPS
+
+### Scaling
+
+- **Horizontal Scaling**: Run multiple instances behind load balancer
+- **GPU Support**: Enable CUDA for Tamil classifier if GPU available
+- **Database**: Consider adding database for result caching
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/new-feature`
+3. Make changes and test thoroughly
+4. Submit pull request with detailed description
+
+## 📝 License
+
+[Add license information]
+
+## 📞 Support
+
+For issues and questions:
+- Check service logs: `docker-compose logs <service-name>`
+- Verify model files are present
+- Ensure all dependencies are installed
+- Check network connectivity between services
+
+## 🔄 Updates & Maintenance
+
+- **Model Updates**: Replace model files in respective directories
+- **Dependency Updates**: Update requirements.txt and rebuild containers
+- **Data Updates**: Update verified sources for similarity matcher
+- **Security**: Regularly update base images and dependencies
+
+---
+
+**Note**: This system is designed for Tamil and Sinhala language fake news detection. For other languages, additional classifiers would need to be developed following the same architecture pattern.
