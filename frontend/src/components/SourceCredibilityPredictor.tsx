@@ -4,35 +4,57 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
-import { Shield, Loader2, Globe } from "lucide-react";
+import { Shield, Loader2 } from "lucide-react";
 
 interface CredibilityResult {
-  source: string;
   credibility_score: number;
-  category?: string;
-  description?: string;
+  prediction_label: string;
+  confidence_breakdown: {
+    High: number;
+    Low: number;
+    Medium: number;
+  };
 }
 
 const SourceCredibilityPredictor = () => {
-  const [sourceUrl, setSourceUrl] = useState("");
+  const [formData, setFormData] = useState({
+    past_fake: "",
+    past_real: "",
+    domain_age_years: "",
+    followers: "",
+    language: ""
+  });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<CredibilityResult | null>(null);
   const [error, setError] = useState("");
 
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
   const handleCredibilityCheck = async () => {
-    if (!sourceUrl.trim()) return;
+    const { past_fake, past_real, domain_age_years, followers, language } = formData;
+    if (!past_fake || !past_real || !domain_age_years || !followers || !language) {
+      setError("Please fill in all fields.");
+      return;
+    }
 
     setIsAnalyzing(true);
     setError("");
 
     try {
-      // Assuming credibility predictor runs on port 8002 (need to check actual port)
-      const response = await fetch("http://localhost:8002/predict", {
+      const response = await fetch("http://localhost:4000/predict", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url: sourceUrl }),
+        body: JSON.stringify({
+          past_fake: parseInt(past_fake),
+          past_real: parseInt(past_real),
+          domain_age_years: parseFloat(domain_age_years),
+          followers: parseInt(followers),
+          language: language
+        }),
       });
 
       if (!response.ok) {
@@ -76,26 +98,73 @@ const SourceCredibilityPredictor = () => {
             Source Credibility Predictor
           </CardTitle>
           <CardDescription>
-            Check the credibility score of a news source URL
+            Enter source features to predict credibility score
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div>
-            <Label htmlFor="sourceUrl">Source URL</Label>
-            <Input
-              id="sourceUrl"
-              type="url"
-              placeholder="https://example.com"
-              value={sourceUrl}
-              onChange={(e) => setSourceUrl(e.target.value)}
-              className="w-full mt-1"
-            />
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="past_fake">Past Fake News Count</Label>
+              <Input
+                id="past_fake"
+                type="number"
+                placeholder="0"
+                value={formData.past_fake}
+                onChange={(e) => handleInputChange("past_fake", e.target.value)}
+                className="w-full mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="past_real">Past Real News Count</Label>
+              <Input
+                id="past_real"
+                type="number"
+                placeholder="0"
+                value={formData.past_real}
+                onChange={(e) => handleInputChange("past_real", e.target.value)}
+                className="w-full mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="domain_age_years">Domain Age (Years)</Label>
+              <Input
+                id="domain_age_years"
+                type="number"
+                step="0.1"
+                placeholder="0.0"
+                value={formData.domain_age_years}
+                onChange={(e) => handleInputChange("domain_age_years", e.target.value)}
+                className="w-full mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="followers">Followers Count</Label>
+              <Input
+                id="followers"
+                type="number"
+                placeholder="0"
+                value={formData.followers}
+                onChange={(e) => handleInputChange("followers", e.target.value)}
+                className="w-full mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="language">Language</Label>
+              <Input
+                id="language"
+                type="text"
+                placeholder="e.g., English"
+                value={formData.language}
+                onChange={(e) => handleInputChange("language", e.target.value)}
+                className="w-full mt-1"
+              />
+            </div>
           </div>
         </CardContent>
         <CardFooter>
           <Button
             onClick={handleCredibilityCheck}
-            disabled={!sourceUrl.trim() || isAnalyzing}
+            disabled={isAnalyzing}
             className="w-full"
           >
             {isAnalyzing ? (
@@ -128,19 +197,6 @@ const SourceCredibilityPredictor = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                <span className="font-medium">Source:</span>
-                <a
-                  href={result.source}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 underline"
-                >
-                  {result.source}
-                </a>
-              </div>
-
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span>Credibility Score:</span>
@@ -159,19 +215,28 @@ const SourceCredibilityPredictor = () => {
                 </div>
               </div>
 
-              {result.category && (
-                <div className="flex justify-between items-center">
-                  <span>Category:</span>
-                  <span className="font-medium">{result.category}</span>
-                </div>
-              )}
+              <div className="flex justify-between items-center">
+                <span>Prediction Label:</span>
+                <span className="font-medium">{result.prediction_label}</span>
+              </div>
 
-              {result.description && (
-                <div>
-                  <span className="font-medium">Description:</span>
-                  <p className="text-sm text-gray-600 mt-1">{result.description}</p>
+              <div>
+                <span className="font-medium">Confidence Breakdown:</span>
+                <div className="mt-2 space-y-1">
+                  <div className="flex justify-between">
+                    <span>High:</span>
+                    <span>{result.confidence_breakdown.High}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Medium:</span>
+                    <span>{result.confidence_breakdown.Medium}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Low:</span>
+                    <span>{result.confidence_breakdown.Low}%</span>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </CardContent>
         </Card>
