@@ -192,6 +192,8 @@ coverage.xml
 venv/
 ENV/
 env/
+backend/*/venv/
+backend/*/.venv/
 
 # IDE
 .vscode/
