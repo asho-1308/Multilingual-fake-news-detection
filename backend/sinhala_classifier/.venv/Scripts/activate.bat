@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=C:\Users\DELL\Downloads\Multilingual-fake-news-detection-main\Multilingual-fake-news-detection-main\backend\sinhala_classifier\.venv
+set VIRTUAL_ENV=C:\Users\LENOVO\Desktop\Multilingual-fake-news-detection\backend\sinhala_classifier\.venv
 
 if not defined PROMPT set PROMPT=$P$G
 

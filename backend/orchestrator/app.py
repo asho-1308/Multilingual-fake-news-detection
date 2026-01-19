@@ -2,14 +2,16 @@ from flask import Flask, request, jsonify
 import requests
 import re
 from langdetect import detect
+import subprocess
+import os
 
 app = Flask(__name__)
 
 # Service URLs
-TAMIL_CLASSIFIER_URL = "http://tamil-classifier-service:1000"
-SINHALA_CLASSIFIER_URL = "http://sinhala-classifier-service:2000"
-SIMILARITY_MATCHER_URL = "http://similarity-matcher-service:3000"
-CREDIBILITY_PREDICTOR_URL = "http://credibility-predictor-service:4000"
+TAMIL_CLASSIFIER_URL = "http://localhost:1000"
+SINHALA_CLASSIFIER_URL = "http://localhost:2000"
+SIMILARITY_MATCHER_URL = "http://localhost:3000"
+CREDIBILITY_PREDICTOR_URL = "http://localhost:4000"
 
 def detect_language(text):
     try:
@@ -80,4 +82,30 @@ def predict():
     return jsonify(result), 200
 
 if __name__ == "__main__":
+    # Define services to start
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    services = [
+        {
+            "cwd": os.path.join(project_root, "backend", "sinhala_classifier"),
+            "command": [os.path.join(project_root, "backend", "sinhala_classifier", ".venv", "Scripts", "python.exe"), "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "2000"]
+        },
+        {
+            "cwd": os.path.join(project_root, "backend", "similarity_matcher"),
+            "command": [os.path.join(project_root, "backend", "similarity_matcher", "venv", "Scripts", "python.exe"), "app.py"]
+        },
+        {
+            "cwd": os.path.join(project_root, "backend", "tamil_classifier"),
+            "command": [os.path.join(project_root, "backend", "tamil_classifier", "venv", "Scripts", "python.exe"), "main.py"]
+        },
+        {
+            "cwd": os.path.join(project_root, "backend", "credibility_predictor"),
+            "command": [os.path.join(project_root, "backend", "credibility_predictor", "venv", "Scripts", "python.exe"), "app.py"]
+        }
+    ]
+    
+    # Start each service in the background
+    for service in services:
+        subprocess.Popen(service["command"], cwd=service["cwd"])
+    
+    # Run the orchestrator
     app.run(host="0.0.0.0", port=5000, debug=True)
