@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import requests
 import re
 from langdetect import detect
@@ -6,6 +7,8 @@ import subprocess
 import os
 
 app = Flask(__name__)
+# Allow cross-origin requests from the frontend dev server
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Service URLs
 TAMIL_CLASSIFIER_URL = "http://localhost:1000"
@@ -13,76 +16,167 @@ SINHALA_CLASSIFIER_URL = "http://localhost:2000"
 SIMILARITY_MATCHER_URL = "http://localhost:3000"
 CREDIBILITY_PREDICTOR_URL = "http://localhost:4000"
 
-def detect_language(text):
+
+def detect_language(text: str) -> str:
+    """Detect language with a quick Unicode-range check for Tamil/Sinhala,
+    then fall back to `langdetect` for other languages.
+    """
+    if not text or not isinstance(text, str):
+        return "unknown"
+
+    # Tamil Unicode block: U+0B80–U+0BFF
+    if re.search(r"[\u0B80-\u0BFF]", text):
+        return "tamil"
+
+    # Sinhala Unicode block: U+0D80–U+0DFF
+    if re.search(r"[\u0D80-\u0DFF]", text):
+        return "sinhala"
+
+    # Fallback to langdetect for other languages
     try:
         lang = detect(text)
-        if lang == 'ta':
-            return 'tamil'
-        elif lang == 'si':
-            return 'sinhala'
+        if lang == "ta":
+            return "tamil"
+        elif lang == "si":
+            return "sinhala"
         else:
-            return 'english'  # or other
-    except:
-        return 'unknown'
+            return lang
+    except Exception:
+        return "unknown"
+
 
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "message": "Orchestrator service is running"}), 200
 
+
 @app.route("/predict", methods=["POST"])
 def predict():
-    data = request.get_json()
-    if not data or "text" not in data:
-        return jsonify({"error": "Missing 'text' in request"}), 400
-
-    text = data["text"].strip()
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
     if not text:
-        return jsonify({"error": "Text cannot be empty"}), 400
+        return jsonify({"error": "Missing or empty 'text' in request"}), 400
 
-    # Detect language
+    # Detect language only here
     language = detect_language(text)
 
-    # Call appropriate classifier
+    # Forward to language-specific classifier when available
     classifier_result = None
-    if language == 'tamil':
-        try:
-            response = requests.post(f"{TAMIL_CLASSIFIER_URL}/predict", json={"text": text}, timeout=30)
-            if response.status_code == 200:
-                classifier_result = response.json()
-        except:
-            pass
-    elif language == 'sinhala':
-        try:
-            response = requests.post(f"{SINHALA_CLASSIFIER_URL}/predict", json={"text": text}, timeout=30)
-            if response.status_code == 200:
-                classifier_result = response.json()
-        except:
-            pass
+    try:
+        if language == "tamil":
+            resp = requests.post(f"{TAMIL_CLASSIFIER_URL}/predict", json={"text": text}, timeout=30)
+            if resp.status_code == 200:
+                classifier_result = resp.json()
+                # Normalize Tamil response: it has 'prediction' and 'confidence'
+                if 'prediction' in classifier_result:
+                    classifier_result = {
+                        'prediction': classifier_result['prediction'],
+                        'confidence': classifier_result.get('confidence', 0.0)
+                    }
 
-    # Call similarity matcher
+        elif language == "sinhala":
+            resp = requests.post(f"{SINHALA_CLASSIFIER_URL}/predict", json={"text": text}, timeout=30)
+            if resp.status_code == 200:
+                classifier_result = resp.json()
+                # Normalize Sinhala response: it has 'label' and 'confidence'
+                if 'label' in classifier_result:
+                    classifier_result = {
+                        'prediction': classifier_result['label'],
+                        'confidence': classifier_result.get('confidence', 0.0)
+                    }
+        else:
+            # unknown or other languages: do not call language-specific classifiers
+            classifier_result = None
+    except Exception:
+        classifier_result = None
+
+    # Always call the similarity matcher for any language
     similarity_result = None
     try:
-        response = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json={"claim": text}, timeout=30)
-        if response.status_code == 200:
-            similarity_result = response.json()
-    except:
-        pass
+        resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json={"claim": text}, timeout=30)
+        if resp.status_code == 200:
+            similarity_result = resp.json()
+    except Exception:
+        similarity_result = None
 
-    # Call credibility predictor (this could be additional logic)
-    credibility_result = {"credibility": "unknown", "confidence": 0.0}
+    # Call credibility predictor for all requests
+    credibility_result = None
+    try:
+        cred_payload = {
+            "past_fake": data.get("past_fake", 0),
+            "past_real": data.get("past_real", 0),
+            "domain_age_years": data.get("domain_age_years", 0),
+            "followers": data.get("followers", 0),
+            "language": language
+        }
+        resp = requests.post(f"{CREDIBILITY_PREDICTOR_URL}/predict", json=cred_payload, timeout=30)
+        if resp.status_code == 200:
+            credibility_result = resp.json()
+            # Normalize credibility response: 'prediction_label' -> 'credibility', 'credibility_score' -> 'confidence' (0-1)
+            if 'prediction_label' in credibility_result:
+                credibility_result = {
+                    'credibility': credibility_result['prediction_label'],
+                    'confidence': credibility_result.get('credibility_score', 0.0) / 100.0
+                }
+    except Exception:
+        credibility_result = None
 
-    # Combine results
+    # Simple ensemble for final prediction
+    final_prediction = "Unknown"
+    final_confidence = 0.0
+
+    try:
+        signals = []
+        if classifier_result and classifier_result.get('prediction'):
+            pred = str(classifier_result.get('prediction')).lower()
+            conf = float(classifier_result.get('confidence', 0.0))
+            signals.append((pred, conf))
+
+        sim_fake = False
+        if similarity_result and similarity_result.get('final_verdict'):
+            fv = similarity_result.get('final_verdict', '').lower()
+            if 'false' in fv or 'fake' in fv:
+                sim_fake = True
+
+        cred_fake = False
+        if credibility_result and credibility_result.get('credibility'):
+            cl = credibility_result.get('credibility', '').lower()
+            if 'low' in cl or 'not' in cl or 'un' in cl:
+                cred_fake = True
+
+        is_fake = False
+        for p, c in signals:
+            if 'fake' in p or 'false' in p:
+                is_fake = True
+                final_confidence = max(final_confidence, c)
+
+        if sim_fake:
+            is_fake = True
+            final_confidence = max(final_confidence, similarity_result.get('confidence', 0.0))
+
+        if cred_fake:
+            is_fake = True
+            final_confidence = max(final_confidence, credibility_result.get('confidence', 0.0))
+
+        final_prediction = 'Fake' if is_fake else 'Real'
+
+    except Exception:
+        final_prediction = 'Unknown'
+
     result = {
         "language": language,
         "classifier": classifier_result,
         "similarity": similarity_result,
-        "credibility": credibility_result
+        "credibility": credibility_result,
+        "final_prediction": final_prediction,
+        "final_confidence": round(final_confidence, 4)
     }
 
     return jsonify(result), 200
 
+
 if __name__ == "__main__":
-    # Define services to start
+    # Define services to start (paths assume repo layout). Set ORCHESTRATOR_START_SERVICES=0 to skip.
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     services = [
         {
@@ -102,10 +196,13 @@ if __name__ == "__main__":
             "command": [os.path.join(project_root, "backend", "credibility_predictor", "venv", "Scripts", "python.exe"), "app.py"]
         }
     ]
-    
-    # Start each service in the background
-    for service in services:
-        subprocess.Popen(service["command"], cwd=service["cwd"])
-    
-    # Run the orchestrator
+
+    if os.environ.get("ORCHESTRATOR_START_SERVICES", "1") == "1":
+        for service in services:
+            try:
+                subprocess.Popen(service["command"], cwd=service["cwd"])
+            except Exception:
+                # best-effort; orchestrator should still run even if child services fail to start
+                pass
+
     app.run(host="0.0.0.0", port=5000, debug=True)
