@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip
 RUN pip install --upgrade pip
 
-# Install common Python dependencies (use a faster mirror to speed up downloads)
-RUN pip install --no-cache-dir --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
+# Install common Python dependencies
+RUN pip install --no-cache-dir --timeout=600 \
     torch==2.9.1 \
     transformers==4.36.0 \
     numpy==1.24.3 \
