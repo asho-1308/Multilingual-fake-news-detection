@@ -15,14 +15,17 @@ interface ClassifierResult {
 }
 
 interface SimilarityMatch {
+  claim: string;
+  similarity: number;
   source: string;
-  article_title: string;
-  similarity_score: number;
-  article_url: string;
+  url: string;
+  verdict: string;
 }
 
 interface SimilarityResult {
-  matches: SimilarityMatch[];
+  final_verdict: string;
+  confidence: number;
+  neighbors: SimilarityMatch[];
 }
 
 interface CredibilityResult {
@@ -35,6 +38,8 @@ interface PredictionResponse {
   classifier: ClassifierResult | null;
   similarity: SimilarityResult | null;
   credibility: CredibilityResult | null;
+  final_prediction: string;
+  final_confidence: number;
 }
 
 const Prediction = () => {
@@ -147,14 +152,14 @@ const Prediction = () => {
               </Card>
             )}
 
-            {result.similarity && result.similarity.matches.length > 0 && (
+            {result.similarity && result.similarity.neighbors && result.similarity.neighbors.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Similarity Matches</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-4">
-                    {result.similarity.matches.map((match, index) => (
+                    {result.similarity.neighbors.map((match, index) => (
                       <li key={index} className="border-b pb-2">
                         <p>
                           <strong>Source:</strong> {match.source}
@@ -162,17 +167,20 @@ const Prediction = () => {
                         <p>
                           <strong>Title:</strong>{" "}
                           <a
-                            href={match.article_url}
+                            href={match.url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-500 hover:underline"
                           >
-                            {match.article_title}
+                            {match.claim}
                           </a>
                         </p>
                         <p>
                           <strong>Similarity Score:</strong>{" "}
-                          {(match.similarity_score * 100).toFixed(2)}%
+                          {(match.similarity * 100).toFixed(2)}%
+                        </p>
+                        <p>
+                          <strong>Verdict:</strong> {match.verdict}
                         </p>
                       </li>
                     ))}
@@ -206,6 +214,30 @@ const Prediction = () => {
                  </CardContent>
                </Card>
             )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Final Prediction</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div>
+                  Overall Prediction:{" "}
+                  <Badge
+                    variant={
+                      result.final_prediction.toLowerCase() === "real"
+                        ? "default"
+                        : "destructive"
+                    }
+                  >
+                    {result.final_prediction}
+                  </Badge>
+                </div>
+                <p>
+                  Confidence:{" "}
+                  {(result.final_confidence * 100).toFixed(2)}%
+                </p>
+              </CardContent>
+            </Card>
           </div>
         )}
       </CardContent>
