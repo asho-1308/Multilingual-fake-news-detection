@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import requests
 import re
 from langdetect import detect
@@ -6,6 +7,8 @@ import subprocess
 import os
 
 app = Flask(__name__)
+# Allow cross-origin requests from the frontend dev server
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Service URLs
 TAMIL_CLASSIFIER_URL = "http://localhost:1000"
@@ -14,16 +17,29 @@ SIMILARITY_MATCHER_URL = "http://localhost:3000"
 CREDIBILITY_PREDICTOR_URL = "http://localhost:4000"
 
 def detect_language(text):
+    """Detect language with a quick Unicode-range check for Tamil/Sinhala,
+    then fall back to `langdetect` for other languages.
+    This improves detection for short native-script inputs.
+    """
+    # Tamil Unicode block: U+0B80–U+0BFF
+    if re.search("[\u0B80-\u0BFF]", text):
+        return "tamil"
+
+    # Sinhala Unicode block: U+0D80–U+0DFF
+    if re.search("[\u0D80-\u0DFF]", text):
+        return "sinhala"
+
+    # Fallback to langdetect for other languages
     try:
         lang = detect(text)
-        if lang == 'ta':
-            return 'tamil'
-        elif lang == 'si':
-            return 'sinhala'
+        if lang == "ta":
+            return "tamil"
+        elif lang == "si":
+            return "sinhala"
         else:
-            return 'english'  # or other
-    except:
-        return 'unknown'
+            return lang
+    except Exception:
+        return "unknown"
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -103,9 +119,11 @@ if __name__ == "__main__":
         }
     ]
     
-    # Start each service in the background
-    for service in services:
-        subprocess.Popen(service["command"], cwd=service["cwd"])
+    # Optionally start other microservices. Set ORCHESTRATOR_START_SERVICES=0
+    # in the environment to prevent auto-starting (useful for local testing).
+    if os.environ.get("ORCHESTRATOR_START_SERVICES", "1") == "1":
+        for service in services:
+            subprocess.Popen(service["command"], cwd=service["cwd"])
     
     # Run the orchestrator
     app.run(host="0.0.0.0", port=5000, debug=True)

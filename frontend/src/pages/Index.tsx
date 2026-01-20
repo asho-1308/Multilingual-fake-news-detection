@@ -5,6 +5,7 @@ import FeatureDashboard from "@/components/FeatureDashboard";
 import TrendingTopics from "@/components/TrendingTopics";
 import RecentNews from "@/components/RecentNews";
 import Footer from "@/components/Footer";
+import Prediction from "@/components/Prediction";
 
 const Index = () => {
   return (
@@ -22,6 +23,7 @@ const Index = () => {
         </div>
 
         <div className="space-y-12">
+          <Prediction />
           <FeatureDashboard />
           <TrendingTopics />
           <RecentNews />
