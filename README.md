@@ -73,6 +73,41 @@ The system consists of microservices architecture with the following components:
    - Frontend: http://localhost:8080
    - API Documentation: http://localhost:5000 (Orchestrator)
 
+   ### Chrome Extension (Optional)
+
+   A lightweight Chrome extension is included to scan headings on Tamil/Sinhala websites and show credibility/prediction results using the local orchestrator API.
+
+   - Folder: `chrome-extension/`
+   - Purpose: Scan H1–H6 and common headline elements, send selected headings to `POST http://localhost:5000/predict`, and display results as an overlay on the page.
+
+   Installation (developer mode)
+
+   1. Ensure the orchestrator is running at `http://localhost:5000` (or update the extension code to point to a remote API).
+   2. Open Chrome and go to `chrome://extensions`.
+   3. Enable **Developer mode** (top-right).
+   4. Click **Load unpacked** and select the `chrome-extension` folder in the repository.
+   5. The extension icon will appear in the toolbar. Click it and press **Scan Headings**.
+
+   Usage
+
+   - Click **Scan Headings** to detect page headings. Detected headings are listed in the popup.
+   - Click **Analyze** next to a heading to call the orchestrator and display a small overlay with the prediction and confidence.
+   - If the content script cannot be injected (some pages or CSP restrictions), the popup will fall back to injecting a scanner function using `chrome.scripting.executeScript`.
+
+   Developer notes
+
+   - The extension uses `chrome.scripting.executeScript` as a fallback when content scripts are not present on the page.
+   - The content script is `chrome-extension/content_script.js` and the popup UI is `chrome-extension/popup.html` + `popup.js`.
+   - Icon files are under `chrome-extension/icons/` and the manifest is `chrome-extension/manifest.json`.
+   - To test without the backend, you can temporarily modify `content_script.js` to mock responses or the popup to show simulated outputs.
+
+   Security & privacy
+
+   - The extension only scans headings (H1–H6 and common headline classes) when you click the popup; it does not automatically send page content without user action.
+   - Be careful when using the extension on sites with sensitive content — you can choose to run the extension only on pages you trust.
+   - For production deployment, host the backend on a secure HTTPS endpoint and update `host_permissions` in the manifest accordingly.
+
+
 ### Local Development Setup
 
 1. **Backend Setup**:
