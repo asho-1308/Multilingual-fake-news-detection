@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fake News Detector</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h3>Fake News Detector</h3>
+      <button id="scanBtn">Scan Headings</button>
+      <div id="status"></div>
+      <div id="results">
+        <p id="summary" style="margin-top:8px">No scan yet</p>
+        <ul id="headingsList"></ul>
+      </div>
+      <p class="note">Requires backend at <code>http://localhost:5000</code></p>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
