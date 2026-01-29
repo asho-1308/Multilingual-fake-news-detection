@@ -1,0 +1,5 @@
+body { font-family: Arial, sans-serif; }
+.container { padding: 12px; width: 260px; }
+#scanBtn { width: 100%; padding: 8px; margin-top: 8px }
+#status { margin-top: 8px; color: #333 }
+.note { font-size: 11px; color: #666 }
