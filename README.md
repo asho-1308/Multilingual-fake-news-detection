@@ -48,6 +48,31 @@ The system consists of microservices architecture with the following components:
 
 ### Prerequisites
 - Docker and Docker Compose
+- Windows PowerShell (for the utility script)
+
+### Run the Full Backend
+To run the entire backend system (all 5 services) with a single command, use the provided utility script. This script automatically builds the common base image and starts all services in the correct environment.
+
+**Option 1: Using PowerShell Script (Recommended)**
+```powershell
+.\run-backend.ps1
+```
+
+**Option 2: Manual Docker Commands**
+If you prefer not to use the script, you must build the base image before running compose:
+```powershell
+docker build -t multilingual-fake-news-detection-base:latest -f ./backend/base.Dockerfile ./backend
+docker compose up --build -d
+```
+
+### Individual Service Access
+Once running, you can access the services at:
+- **Main API (Orchestrator)**: [http://localhost:5000](http://localhost:5000)
+- **Web Frontend**: [http://localhost:8080](http://localhost:8080)
+- **Tamil Classifier**: [http://localhost:1000](http://localhost:1000)
+- **Sinhala Classifier**: [http://localhost:2000](http://localhost:2000)
+- **Similarity Matcher**: [http://localhost:3000](http://localhost:3000)
+- **Credibility Predictor**: [http://localhost:4000](http://localhost:4000)
 - 8GB+ RAM recommended
 - Python 3.8+ (for local development)
 
@@ -73,12 +98,15 @@ The system consists of microservices architecture with the following components:
    - Frontend: http://localhost:8080
    - API Documentation: http://localhost:5000 (Orchestrator)
 
-   ### Chrome Extension (Optional)
+   ### Chrome Extension (Updated UI)
 
-   A lightweight Chrome extension is included to scan headings on Tamil/Sinhala websites and show credibility/prediction results using the local orchestrator API.
+   A modern, redesigned Chrome extension is included to scan news headings and show real-time verification results directly on the page.
 
-   - Folder: `chrome-extension/`
-   - Purpose: Scan H1–H6 and common headline elements, send selected headings to `POST http://localhost:5000/predict`, and display results as an overlay on the page.
+   - **Features**: 
+     - **Headlines Scanner**: Automatically detects Tamil and Sinhala headings on active news sites.
+     - **Rich Overlays**: Displays color-coded results (**Green** for Real, **Red** for Fake) next to headings.
+     - **Detailed Metrics**: Shows confidence percentage balance and specific match data from the backend.
+     - **Ensemble Logic**: Uses an improved backend voting system to distinguish between "Real," "Fake," and "Unknown" content.
 
    Installation (developer mode)
 
@@ -158,23 +186,20 @@ The system consists of microservices architecture with the following components:
 ```json
 {
   "language": "tamil",
+  "final_prediction": "Real",
+  "final_confidence": 0.89,
   "classifier": {
-    "status": "success",
     "prediction": "Real",
     "confidence": 0.89
   },
   "similarity": {
-    "matches": [
-      {
-        "source": "Verified News Source",
-        "similarity": 0.95,
-        "url": "https://..."
-      }
-    ]
+    "final_verdict": "Likely TRUE",
+    "confidence": 0.95,
+    "neighbors": [...]
   },
   "credibility": {
     "credibility": "High",
-    "score": 85.2
+    "confidence": 0.85
   }
 }
 ```

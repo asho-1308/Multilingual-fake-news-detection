@@ -29,7 +29,8 @@ RUN pip install --no-cache-dir --timeout=600 \
     requests==2.31.0 \
     python-multipart==0.0.6 \
     pytesseract==0.3.10 \
-    indic-nlp-library==0.92
+    indic-nlp-library==0.92 \
+    langdetect==1.0.9
 
 # Set working directory
 WORKDIR /app
