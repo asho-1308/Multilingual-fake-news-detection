@@ -48,6 +48,27 @@ The system consists of microservices architecture with the following components:
 
 ### Prerequisites
 - Docker and Docker Compose
+
+### Run the Full Backend
+To run the entire backend system (all 5 services) with a single command:
+
+**Option 1: Using PowerShell Script (Recommended)**
+```powershell
+.\run-backend.ps1
+```
+
+**Option 2: Using Docker Compose directly**
+```bash
+docker compose up --build
+```
+
+### Individual Service Access
+Once running, you can access the services at:
+- Orchestrator: http://localhost:5000
+- Tamil Classifier: http://localhost:1000
+- Sinhala Classifier: http://localhost:2000
+- Similarity Matcher: http://localhost:3000
+- Credibility Predictor: http://localhost:4000
 - 8GB+ RAM recommended
 - Python 3.8+ (for local development)
 

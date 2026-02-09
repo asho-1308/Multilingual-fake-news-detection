@@ -8,14 +8,23 @@
   </head>
   <body>
     <div class="container">
-      <h3>Fake News Detector</h3>
-      <button id="scanBtn">Scan Headings</button>
-      <div id="status"></div>
+      <div class="header">
+        <span class="badge">AI</span>
+        <h3>Fake News Detector</h3>
+      </div>
+      
+      <button id="scanBtn">Scan for Headlines</button>
+      
+      <div id="status">Ready to scan current page</div>
+
       <div id="results">
-        <p id="summary" style="margin-top:8px">No scan yet</p>
+        <p id="summary">No headings detected yet.</p>
         <ul id="headingsList"></ul>
       </div>
-      <p class="note">Requires backend at <code>http://localhost:5000</code></p>
+
+      <div class="note">
+        Backend: <code>localhost:5000</code>
+      </div>
     </div>
     <script src="popup.js"></script>
   </body>

@@ -9,45 +9,57 @@ function clearList() {
 
 function addListItem(text, index) {
   const li = document.createElement('li');
-  li.style.marginBottom = '6px';
-  const span = document.createElement('span');
-  span.textContent = text.length > 120 ? text.slice(0, 120) + '…' : text;
+  
+  const span = document.createElement('div');
+  span.className = 'heading-text';
+  span.textContent = text.length > 150 ? text.slice(0, 150) + '…' : text;
   span.title = text;
-  span.style.display = 'inline-block';
-  span.style.width = '170px';
+  
   const btn = document.createElement('button');
-  btn.textContent = 'Analyze';
-  btn.style.marginLeft = '6px';
+  btn.className = 'analyze-btn';
+  btn.textContent = 'Analyze Content';
+  
   btn.addEventListener('click', async () => {
-    status.textContent = 'Analyzing...';
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+    status.textContent = 'Analyzing heading...';
+    
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    // Try messaging the content script first
+    
     chrome.tabs.sendMessage(tab.id, { action: 'analyze_heading', text }, (resp) => {
+      btn.disabled = false;
+      btn.textContent = 'Analyze Content';
+      
       if (!chrome.runtime.lastError && resp && resp.analyzed) {
-        status.textContent = 'Analysis triggered';
+        status.textContent = 'Analysis result shown on page';
         return;
       }
 
-      // Fallback: execute a small fetch in the page context to call the orchestrator directly
+      // Fallback
       const fn = (headingText) => {
         return fetch('http://localhost:5000/predict', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: headingText })
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ text: headingText })
         }).then(r => r.json()).then(d => ({ ok: true, data: d })).catch(e => ({ ok: false, err: String(e) }));
       };
 
       chrome.scripting.executeScript({ target: { tabId: tab.id }, func: fn, args: [text] }, (res) => {
-        if (!res || !res[0]) { status.textContent = 'Analysis failed (injection)'; return; }
+        if (!res || !res[0]) { status.textContent = 'Analysis failed'; return; }
         const out = res[0].result;
         if (out && out.ok) {
           const d = out.data;
-          alert('Prediction: ' + (d.final_prediction || 'Unknown') + '\nConfidence: ' + (d.final_confidence || 0));
-          status.textContent = 'Analysis (fallback) complete';
+          const pred = d.final_prediction || 'Unknown';
+          const conf = d.final_confidence ? (d.final_confidence * 100).toFixed(0) + '%' : '';
+          alert(`Result: ${pred} (${conf})`);
+          status.textContent = `Completed: ${pred}`;
         } else {
-          status.textContent = 'Analysis failed: ' + (out && out.err ? out.err : 'unknown');
+          status.textContent = 'Connection Error';
         }
       });
     });
   });
+
   li.appendChild(span);
   li.appendChild(btn);
   headingsList.appendChild(li);

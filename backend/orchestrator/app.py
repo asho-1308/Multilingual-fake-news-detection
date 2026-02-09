@@ -130,35 +130,41 @@ def predict():
         if classifier_result and classifier_result.get('prediction'):
             pred = str(classifier_result.get('prediction')).lower()
             conf = float(classifier_result.get('confidence', 0.0))
-            signals.append((pred, conf))
+            if conf > 0.01: # Avoid zero-confidence signals
+                is_p_fake = ('fake' in pred or 'false' in pred)
+                signals.append({'is_fake': is_p_fake, 'conf': conf, 'source': 'classifier'})
 
-        sim_fake = False
         if similarity_result and similarity_result.get('final_verdict'):
             fv = similarity_result.get('final_verdict', '').lower()
-            if 'false' in fv or 'fake' in fv:
-                sim_fake = True
+            conf = similarity_result.get('confidence', 0.0)
+            # Only count as a signal if it actually found a match (don't treat "No Match" as a "Real" vote)
+            if conf > 0.1 and "no match" not in fv:
+                is_s_fake = ('false' in fv or 'fake' in fv)
+                signals.append({'is_fake': is_s_fake, 'conf': conf, 'source': 'similarity'})
 
-        cred_fake = False
         if credibility_result and credibility_result.get('credibility'):
             cl = credibility_result.get('credibility', '').lower()
-            if 'low' in cl or 'not' in cl or 'un' in cl:
-                cred_fake = True
+            conf = credibility_result.get('confidence', 0.0)
+            # Only count credibility if it's very certain or specifically "Low" (Fake)
+            is_c_fake = ('low' in cl or 'not' in cl or 'un' in cl)
+            if is_c_fake or conf > 0.7:
+                signals.append({'is_fake': is_c_fake, 'conf': conf, 'source': 'credibility'})
 
-        is_fake = False
-        for p, c in signals:
-            if 'fake' in p or 'false' in p:
-                is_fake = True
-                final_confidence = max(final_confidence, c)
-
-        if sim_fake:
-            is_fake = True
-            final_confidence = max(final_confidence, similarity_result.get('confidence', 0.0))
-
-        if cred_fake:
-            is_fake = True
-            final_confidence = max(final_confidence, credibility_result.get('confidence', 0.0))
-
-        final_prediction = 'Fake' if is_fake else 'Real'
+        if signals:
+            fake_signals = [s for s in signals if s['is_fake']]
+            real_signals = [s for s in signals if not s['is_fake']]
+            
+            # Weighted confidence: Bias towards classifier and similarity
+            if fake_signals and (len(fake_signals) >= len(real_signals)):
+                final_prediction = "Fake"
+                final_confidence = max(s['conf'] for s in fake_signals)
+            elif real_signals:
+                final_prediction = "Real"
+                final_confidence = max(s['conf'] for s in real_signals)
+            else:
+                final_prediction = "Unknown"
+        else:
+            final_prediction = "Unknown"
 
     except Exception:
         final_prediction = 'Unknown'
