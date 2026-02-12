@@ -51,19 +51,34 @@ The system consists of microservices architecture with the following components:
 - Windows PowerShell (for the utility script)
 
 ### Run the Full Backend
-To run the entire backend system (all 5 services) with a single command, use the provided utility script. This script automatically builds the common base image and starts all services in the correct environment.
+Run all backend microservices with a single command (recommended). The project includes a PowerShell helper that builds the common base image and starts every service in detached mode.
 
-**Option 1: Using PowerShell Script (Recommended)**
+Prerequisite (Windows): make sure **Docker Desktop** is running.
+
+**Recommended (one command — Windows PowerShell)**
 ```powershell
+cd C:\Users\LENOVO\Desktop\Multilingual-fake-news-detection
 .\run-backend.ps1
 ```
 
-**Option 2: Manual Docker Commands**
-If you prefer not to use the script, you must build the base image before running compose:
+**Direct Docker Compose (alternative)**
+- Build the common base image (only required once or after dependency changes):
 ```powershell
 docker build -t multilingual-fake-news-detection-base:latest -f ./backend/base.Dockerfile ./backend
+```
+- Start all services with Compose:
+```powershell
 docker compose up --build -d
 ```
+
+Quick verification:
+```powershell
+docker compose ps
+docker compose logs -f        # tail all logs
+curl http://localhost:5000/health   # orchestrator health
+```
+
+---
 
 ### Individual Service Access
 Once running, you can access the services at:
@@ -84,19 +99,28 @@ Once running, you can access the services at:
    cd multilingual-fake-news-detection
    ```
 
-2. **Start all services**:
+2. **Recommended — start everything (Windows)**
+   ```powershell
+   # preferred: use helper which builds the base image and starts all services
+   .\run-backend.ps1
+   ```
+
+   Or manually with Docker Compose v2:
    ```bash
-   docker-compose up -d
+   docker build -t multilingual-fake-news-detection-base:latest -f ./backend/base.Dockerfile ./backend
+   docker compose up --build -d
    ```
 
 3. **Check service health**:
    ```bash
-   docker-compose ps
+   docker compose ps
    ```
 
 4. **Access the application**:
    - Frontend: http://localhost:8080
-   - API Documentation: http://localhost:5000 (Orchestrator)
+   - API Documentation / Orchestrator: http://localhost:5000
+
+
 
    ### Chrome Extension (Updated UI)
 
