@@ -80,6 +80,15 @@
   document.head.appendChild(style);
 
   async function analyzeHeading(el, text) {
+    // Sanitize text before sending: keep Tamil (\u0B80-\u0BFF), Sinhala (\u0D80-\u0DFF), common punctuation and spaces.
+    // This avoids classifier OCR/cleaning returning empty strings for mixed/noisy headings.
+    const sanitizeForBackend = (s) => {
+      if (!s || typeof s !== 'string') return '';
+      return s.replace(/[^\u0B80-\u0BFF\u0D80-\u0DFF\s\.,!\?"'\-:\;\(\)\/]/g, ' ').replace(/\s+/g, ' ').trim();
+    };
+
+    const sendText = sanitizeForBackend(text);
+
     showOverlay(el, `
       <div class="fnd-loader">
         <div class="fnd-spinner"></div>
@@ -91,7 +100,7 @@
       const resp = await fetch('http://localhost:5000/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text: sendText || text })
       });
       if (!resp.ok) throw new Error(`Status ${resp.status}`);
       const data = await resp.json();

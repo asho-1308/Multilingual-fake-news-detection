@@ -44,6 +44,10 @@ interface PredictionResponse {
 
 const Prediction = () => {
   const [text, setText] = useState("");
+  const [pastFake, setPastFake] = useState("0");
+  const [pastReal, setPastReal] = useState("0");
+  const [domainAge, setDomainAge] = useState("0");
+  const [followers, setFollowers] = useState("0");
   const [result, setResult] = useState<PredictionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   // Guard `useToast` in case the hook isn't available during rendering
@@ -64,12 +68,20 @@ const Prediction = () => {
     setResult(null);
 
     try {
+      const payload = {
+        text,
+        past_fake: parseInt(pastFake || "0"),
+        past_real: parseInt(pastReal || "0"),
+        domain_age_years: parseFloat(domainAge || "0"),
+        followers: parseInt(followers || "0"),
+      };
+
       const response = await fetch("http://localhost:5000/predict", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -103,6 +115,51 @@ const Prediction = () => {
             onChange={(e) => setText(e.target.value)}
             rows={6}
           />
+
+          <div className="grid grid-cols-4 gap-2">
+            <div>
+              <label className="text-sm">Past Fake</label>
+              <input
+                className="w-full border rounded px-2 py-1"
+                type="number"
+                min={0}
+                value={pastFake}
+                onChange={(e) => setPastFake(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm">Past Real</label>
+              <input
+                className="w-full border rounded px-2 py-1"
+                type="number"
+                min={0}
+                value={pastReal}
+                onChange={(e) => setPastReal(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm">Domain Age (years)</label>
+              <input
+                className="w-full border rounded px-2 py-1"
+                type="number"
+                min={0}
+                step="0.1"
+                value={domainAge}
+                onChange={(e) => setDomainAge(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm">Followers</label>
+              <input
+                className="w-full border rounded px-2 py-1"
+                type="number"
+                min={0}
+                value={followers}
+                onChange={(e) => setFollowers(e.target.value)}
+              />
+            </div>
+          </div>
+
           <Button onClick={handleSubmit} disabled={isLoading}>
             {isLoading ? "Analyzing..." : "Analyze"}
           </Button>
