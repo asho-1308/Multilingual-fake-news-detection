@@ -36,7 +36,11 @@ The system consists of microservices architecture with the following components:
 
 5. **🎯 Orchestrator** (Port 5000)
    - **Function**: Main coordinator that routes requests based on language detection
-   - **Features**: Automatic language detection, service orchestration, result aggregation
+   - **Features**: Automatic language detection, weighted ensemble analysis, result aggregation
+   - **Ensemble Logic**: Combines signals from classifiers, similarity matches, and source credibility using a weighted scoring system:
+     - **Linguistic Classifier**: Expert signal (Weight: High)
+     - **Similarity Matcher**: Direct fact-check signal (Weight: Critical if match found)
+     - **Credibility Predictor**: Contextual supporting signal (Weight: Supporting)
    - **Technology**: Flask, LangDetect
 
 6. **🖥️ Frontend** (Port 8080)
