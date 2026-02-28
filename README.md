@@ -14,7 +14,7 @@ The system consists of microservices architecture with the following components:
    - **Technology**: FastAPI, Transformers, EasyOCR, Indic NLP Library
    - **Model**: Fine-tuned transformer model trained on Tamil news dataset
 
-2. **📰 Sinhala Classifier** (Port 2000)
+2. **📰 Sinhala Classifier** (Port 2000)  //uvicorn app.main:app --port 2000 --reload
    - **Function**: Detects fake news in Sinhala language content
    - **Features**: Text classification with Sinhala language processing
    - **Technology**: FastAPI, Machine learning models
@@ -187,7 +187,7 @@ Once running, you can access the services at:
    ```bash
    # Start each service in separate terminals
    cd backend/tamil_classifier && python main.py
-   cd backend/sinhala_classifier && python app.py
+   cd backend/sinhala_classifier && python -m uvicorn app.main:app --host 0.0.0.0 --port 2000 --reload
    cd backend/similarity_matcher && python app.py
    cd backend/credibility_predictor && python app.py
    cd backend/orchestrator && python app.py

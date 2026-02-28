@@ -37,10 +37,16 @@ function addListItem(text, index) {
 
       // Fallback
       const fn = (headingText) => {
+        // sanitize before sending (keep Tamil/Sinhala ranges + punctuation)
+        const sanitizeForBackend = (s) => {
+          if (!s || typeof s !== 'string') return '';
+          return s.replace(/[^\u0B80-\u0BFF\u0D80-\u0DFF\s\.,!\?"'\-:\;\(\)\/]/g, ' ').replace(/\s+/g, ' ').trim();
+        };
+        const payloadText = sanitizeForBackend(headingText) || headingText;
         return fetch('http://localhost:5000/predict', {
           method: 'POST', 
           headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ text: headingText })
+          body: JSON.stringify({ text: payloadText })
         }).then(r => r.json()).then(d => ({ ok: true, data: d })).catch(e => ({ ok: false, err: String(e) }));
       };
 

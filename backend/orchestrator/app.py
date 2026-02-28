@@ -121,52 +121,67 @@ def predict():
     except Exception:
         credibility_result = None
 
-    # Simple ensemble for final prediction
+    # Analysis-based ensemble for final prediction
     final_prediction = "Unknown"
     final_confidence = 0.0
 
     try:
         signals = []
+        
+        # 1. Linguistic Classifier Signal (Strong)
         if classifier_result and classifier_result.get('prediction'):
             pred = str(classifier_result.get('prediction')).lower()
             conf = float(classifier_result.get('confidence', 0.0))
-            if conf > 0.01: # Avoid zero-confidence signals
+            if conf > 0.1:
                 is_p_fake = ('fake' in pred or 'false' in pred)
-                signals.append({'is_fake': is_p_fake, 'conf': conf, 'source': 'classifier'})
+                # Weighted higher if certainty is high
+                weight = 1.0 if conf > 0.8 else 0.7
+                signals.append({'is_fake': is_p_fake, 'conf': conf, 'weight': weight, 'source': 'classifier'})
 
+        # 2. Similarity Matcher Signal (Strongest if match found)
         if similarity_result and similarity_result.get('final_verdict'):
             fv = similarity_result.get('final_verdict', '').lower()
             conf = similarity_result.get('confidence', 0.0)
-            # Only count as a signal if it actually found a match (don't treat "No Match" as a "Real" vote)
+            # Only count as a signal if it actually found a match
             if conf > 0.1 and "no match" not in fv:
                 is_s_fake = ('false' in fv or 'fake' in fv)
-                signals.append({'is_fake': is_s_fake, 'conf': conf, 'source': 'similarity'})
+                # Similarity matches are very strong signals
+                signals.append({'is_fake': is_s_fake, 'conf': conf, 'weight': 1.2, 'source': 'similarity'})
 
+        # 3. Credibility Signal (Supporting)
         if credibility_result and credibility_result.get('credibility'):
             cl = credibility_result.get('credibility', '').lower()
             conf = credibility_result.get('confidence', 0.0)
-            # Only count credibility if it's very certain or specifically "Low" (Fake)
-            is_c_fake = ('low' in cl or 'not' in cl or 'un' in cl)
-            if is_c_fake or conf > 0.7:
-                signals.append({'is_fake': is_c_fake, 'conf': conf, 'source': 'credibility'})
+            is_c_fake = ('low' in cl or 'not' in cl or 'un' in cl or 'medium' in cl)
+            # Only weight credibility significantly if it's very low or very high
+            weight = 0.5
+            if 'low' in cl: weight = 0.8
+            if 'high' in cl: weight = 0.8
+            signals.append({'is_fake': is_c_fake, 'conf': conf, 'weight': weight, 'source': 'credibility'})
 
         if signals:
-            fake_signals = [s for s in signals if s['is_fake']]
-            real_signals = [s for s in signals if not s['is_fake']]
+            fake_score = sum(s['conf'] * s['weight'] for s in signals if s['is_fake'])
+            real_score = sum(s['conf'] * s['weight'] for s in signals if not s['is_fake'])
+            total_weight = sum(s['weight'] for s in signals)
             
-            # Weighted confidence: Bias towards classifier and similarity
-            if fake_signals and (len(fake_signals) >= len(real_signals)):
+            if fake_score > real_score:
                 final_prediction = "Fake"
-                final_confidence = max(s['conf'] for s in fake_signals)
-            elif real_signals:
+                final_confidence = fake_score / sum(s['weight'] for s in signals if s['is_fake'])
+            elif real_score > fake_score:
                 final_prediction = "Real"
-                final_confidence = max(s['conf'] for s in real_signals)
+                final_confidence = real_score / sum(s['weight'] for s in signals if not s['is_fake'])
             else:
+                # Tie break or fallback
                 final_prediction = "Unknown"
+                final_confidence = 0.0
+                
+            # Normalize confidence to not exceed 100% (though weighted averages naturally stay within range)
+            final_confidence = min(final_confidence, 1.0)
         else:
             final_prediction = "Unknown"
 
-    except Exception:
+    except Exception as e:
+        print(f"Error in ensemble calculation: {e}")
         final_prediction = 'Unknown'
 
     result = {
