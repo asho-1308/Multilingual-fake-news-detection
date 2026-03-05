@@ -97,7 +97,7 @@
     `);
 
     try {
-      const resp = await fetch('http://localhost:5000/predict', {
+      const resp = await fetch('http://127.0.0.1:5000/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: sendText || text })
@@ -158,7 +158,7 @@
 
     const texts = candidates.map(e => (e.innerText || '').trim());
     candidates.forEach(el => analyzeHeading(el, (el.innerText || '').trim()));
-    return { count: candidates.length, samples: texts.slice(0, 10) };
+    return { scanned: true, count: candidates.length, samples: texts.slice(0, 20) };
   }
 
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
