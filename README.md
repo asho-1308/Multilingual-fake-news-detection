@@ -13,12 +13,14 @@ The system consists of microservices architecture with the following components:
    - **Features**: Text classification, OCR for Tamil images, Indic NLP normalization
    - **Technology**: FastAPI, Transformers, EasyOCR, Indic NLP Library
    - **Model**: Fine-tuned transformer model trained on Tamil news dataset
+   - **API Schema**: Returns `{status: "success", prediction: "Fake/Real", confidence: float}`
 
-2. **📰 Sinhala Classifier** (Port 2000)  //uvicorn app.main:app --port 2000 --reload
+2. **📰 Sinhala Classifier** (Port 2000)
    - **Function**: Detects fake news in Sinhala language content
    - **Features**: Text classification with Sinhala language processing
    - **Technology**: FastAPI, Machine learning models
    - **Model**: ML model trained on Sinhala news data
+   - **API Schema**: Returns `{label: "FAKE/REAL", confidence: float}`
 
 3. **🔍 Similarity Matcher** (Port 3000)
    - **Function**: Fact-checks claims against verified news sources using semantic similarity
@@ -31,21 +33,25 @@ The system consists of microservices architecture with the following components:
    - **Features**: ML-based prediction using source features
    - **Technology**: Flask, Scikit-learn, Random Forest
    - **Inputs**: Past fake/real counts, domain age, follower count, language
+   - **Config**: Disables Flask reloader (`use_reloader=False`) to ensure Windows compatibility with subprocesses.
 
 ### Supporting Services
 
 5. **🎯 Orchestrator** (Port 5000)
    - **Function**: Main coordinator that routes requests based on language detection
    - **Features**: Automatic language detection, weighted ensemble analysis, result aggregation
+   - **Networking**: Uses `127.0.0.1` for internal routing to avoid IPv6 `[::1]` resolution issues on Windows.
    - **Ensemble Logic**: Combines signals from classifiers, similarity matches, and source credibility using a weighted scoring system:
      - **Linguistic Classifier**: Expert signal (Weight: High)
      - **Similarity Matcher**: Direct fact-check signal (Weight: Critical if match found)
      - **Credibility Predictor**: Contextual supporting signal (Weight: Supporting)
    - **Technology**: Flask, LangDetect
+   - **Windows Deployment**: Configured with `use_reloader=False` to prevent `WinError 10038` when spawning background microservices.
 
 6. **🖥️ Frontend** (Port 8080)
    - **Function**: User interface for interacting with the detection system
    - **Features**: React-based UI, real-time predictions, multi-language support
+   - **Backend Connection**: Configured to connect to `http://127.0.0.1:5000/predict` for optimized Windows performance.
    - **Technology**: React, Vite, TypeScript, Tailwind CSS
 
 ## 🚀 Quick Start

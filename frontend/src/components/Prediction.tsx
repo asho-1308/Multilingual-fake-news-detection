@@ -76,7 +76,7 @@ const Prediction = () => {
         followers: parseInt(followers || "0"),
       };
 
-      const response = await fetch("http://localhost:5000/predict", {
+      const response = await fetch("http://127.0.0.1:5000/predict", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -201,47 +201,51 @@ const Prediction = () => {
                       {result.classifier.prediction}
                     </Badge>
                   </div>
-                  <p>
+                  <div className="text-sm text-muted-foreground">
                     Confidence:{" "}
                     {(result.classifier.confidence * 100).toFixed(2)}%
-                  </p>
+                  </div>
                 </CardContent>
               </Card>
             )}
 
-            {result.similarity && result.similarity.neighbors && result.similarity.neighbors.length > 0 && (
+            {result.similarity && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Similarity Matches</CardTitle>
+                  <CardTitle>Similarity Evidence</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <ul className="space-y-4">
-                    {result.similarity.neighbors.map((match, index) => (
-                      <li key={index} className="border-b pb-2">
-                        <p>
-                          <strong>Source:</strong> {match.source}
-                        </p>
-                        <p>
-                          <strong>Title:</strong>{" "}
-                          <a
-                            href={match.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:underline"
-                          >
-                            {match.claim}
-                          </a>
-                        </p>
-                        <p>
-                          <strong>Similarity Score:</strong>{" "}
-                          {(match.similarity * 100).toFixed(2)}%
-                        </p>
-                        <p>
-                          <strong>Verdict:</strong> {match.verdict}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    Verdict:{" "}
+                    <Badge variant={result.similarity.final_verdict.toLowerCase().includes('true') ? 'default' : 'destructive'}>
+                      {result.similarity.final_verdict}
+                    </Badge>
+                  </div>
+                  {result.similarity.neighbors && result.similarity.neighbors.length > 0 && (
+                    <ul className="space-y-4">
+                      {result.similarity.neighbors.map((match, index) => (
+                        <li key={index} className="border-b pb-2 last:border-0">
+                          <p className="text-sm">
+                            <strong>Source:</strong> {match.source}
+                          </p>
+                          <p className="text-sm">
+                            <strong>Claim:</strong>{" "}
+                            <a
+                              href={match.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:underline"
+                            >
+                              {match.claim}
+                            </a>
+                          </p>
+                          <p className="text-sm italic">
+                            Verdict: {match.verdict} ({(match.similarity * 100).toFixed(1)}% similarity)
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -252,11 +256,11 @@ const Prediction = () => {
                    <CardTitle>Source Credibility</CardTitle>
                  </CardHeader>
                  <CardContent>
-                   <div>
-                     Credibility:{" "}
+                   <div className="flex items-center gap-2">
+                     Source Status:{" "}
                      <Badge
                        variant={
-                         result.credibility.credibility.toLowerCase() === "credible"
+                         result.credibility.credibility.toLowerCase() === "high" || result.credibility.credibility.toLowerCase() === "credible"
                            ? "default"
                            : "destructive"
                        }
@@ -264,10 +268,9 @@ const Prediction = () => {
                        {result.credibility.credibility}
                      </Badge>
                    </div>
-                   <p>
-                     Confidence:{" "}
-                     {(result.credibility.confidence * 100).toFixed(2)}%
-                   </p>
+                   <div className="text-sm text-muted-foreground mt-1">
+                     Trust Score: {(result.credibility.confidence * 100).toFixed(2)}%
+                   </div>
                  </CardContent>
                </Card>
             )}

@@ -6,15 +6,17 @@ from langdetect import detect
 import subprocess
 import os
 
+import sys
+
 app = Flask(__name__)
 # Allow cross-origin requests from the frontend dev server
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Service URLs
-TAMIL_CLASSIFIER_URL = "http://localhost:1000"
-SINHALA_CLASSIFIER_URL = "http://localhost:2000"
-SIMILARITY_MATCHER_URL = "http://localhost:3000"
-CREDIBILITY_PREDICTOR_URL = "http://localhost:4000"
+# Service URLs - Using loopback ip for Windows stability
+TAMIL_CLASSIFIER_URL = "http://127.0.0.1:1000"
+SINHALA_CLASSIFIER_URL = "http://127.0.0.1:2000"
+SIMILARITY_MATCHER_URL = "http://127.0.0.1:3000"
+CREDIBILITY_PREDICTOR_URL = "http://127.0.0.1:4000"
 
 
 def detect_language(text: str) -> str:
@@ -54,49 +56,79 @@ def health():
 def predict():
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
+    print(f"DEBUG: Processing request for text: '{text[:50]}...'", flush=True)
+    sys.stdout.flush()
+    
     if not text:
         return jsonify({"error": "Missing or empty 'text' in request"}), 400
 
     # Detect language only here
     language = detect_language(text)
+    print(f"DEBUG: Detected language: {language}", flush=True)
+    sys.stdout.flush()
 
     # Forward to language-specific classifier when available
     classifier_result = None
     try:
         if language == "tamil":
+            print(f"DEBUG: Calling Tamil Classifier at {TAMIL_CLASSIFIER_URL}", flush=True)
+            sys.stdout.flush()
             resp = requests.post(f"{TAMIL_CLASSIFIER_URL}/predict", json={"text": text}, timeout=30)
+            print(f"DEBUG: Tamil response status: {resp.status_code}", flush=True)
+            sys.stdout.flush()
             if resp.status_code == 200:
-                classifier_result = resp.json()
-                # Normalize Tamil response: it has 'prediction' and 'confidence'
-                if 'prediction' in classifier_result:
+                raw_classifier = resp.json()
+                print(f"DEBUG: Tamil raw response: {raw_classifier}", flush=True)
+                sys.stdout.flush()
+                # Tamil returns 'prediction' (Fake/Real) and 'confidence' (float) inside a 'success' status
+                if raw_classifier.get('status') == 'success':
                     classifier_result = {
-                        'prediction': classifier_result['prediction'],
-                        'confidence': classifier_result.get('confidence', 0.0)
+                        'prediction': raw_classifier.get('prediction', ''),
+                        'confidence': raw_classifier.get('confidence', 0.0)
                     }
+                else:
+                    print(f"DEBUG: Tamil classifier returned non-success status: {raw_classifier.get('status')}", flush=True)
+                    sys.stdout.flush()
+                    classifier_result = None
 
         elif language == "sinhala":
+            print(f"DEBUG: Calling Sinhala Classifier at {SINHALA_CLASSIFIER_URL}", flush=True)
+            sys.stdout.flush()
             resp = requests.post(f"{SINHALA_CLASSIFIER_URL}/predict", json={"text": text}, timeout=30)
+            print(f"DEBUG: Sinhala response status: {resp.status_code}", flush=True)
+            sys.stdout.flush()
             if resp.status_code == 200:
-                classifier_result = resp.json()
-                # Normalize Sinhala response: it has 'label' and 'confidence'
-                if 'label' in classifier_result:
-                    classifier_result = {
-                        'prediction': classifier_result['label'],
-                        'confidence': classifier_result.get('confidence', 0.0)
-                    }
+                raw_classifier = resp.json()
+                print(f"DEBUG: Sinhala raw response: {raw_classifier}", flush=True)
+                sys.stdout.flush()
+                # Sinhala returns 'label' (FAKE/REAL) and 'confidence' (float)
+                classifier_result = {
+                    'prediction': raw_classifier.get('label', ''),
+                    'confidence': raw_classifier.get('confidence', 0.0)
+                }
         else:
-            # unknown or other languages: do not call language-specific classifiers
+            print(f"DEBUG: No language-specific classifier for {language}", flush=True)
+            sys.stdout.flush()
             classifier_result = None
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG: Exception calling classifier: {e}", flush=True)
+        sys.stdout.flush()
         classifier_result = None
 
     # Always call the similarity matcher for any language
     similarity_result = None
     try:
+        print(f"DEBUG: Calling Similarity Matcher at {SIMILARITY_MATCHER_URL}", flush=True)
+        sys.stdout.flush()
         resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json={"claim": text}, timeout=30)
+        print(f"DEBUG: Similarity response status: {resp.status_code}", flush=True)
+        sys.stdout.flush()
         if resp.status_code == 200:
             similarity_result = resp.json()
-    except Exception:
+            # print(f"DEBUG: Similarity result: {similarity_result}")
+    except Exception as e:
+        print(f"DEBUG: Exception calling similarity matcher: {e}", flush=True)
+        sys.stdout.flush()
         similarity_result = None
 
     # Call credibility predictor for all requests
@@ -109,16 +141,24 @@ def predict():
             "followers": data.get("followers", 0),
             "language": language
         }
+        print(f"DEBUG: Calling Credibility Predictor at {CREDIBILITY_PREDICTOR_URL}", flush=True)
+        sys.stdout.flush()
         resp = requests.post(f"{CREDIBILITY_PREDICTOR_URL}/predict", json=cred_payload, timeout=30)
+        print(f"DEBUG: Credibility response status: {resp.status_code}", flush=True)
+        sys.stdout.flush()
         if resp.status_code == 200:
             credibility_result = resp.json()
-            # Normalize credibility response: 'prediction_label' -> 'credibility', 'credibility_score' -> 'confidence' (0-1)
+            print(f"DEBUG: Credibility raw response: {credibility_result}", flush=True)
+            sys.stdout.flush()
+            # Normalize credibility response
             if 'prediction_label' in credibility_result:
                 credibility_result = {
                     'credibility': credibility_result['prediction_label'],
                     'confidence': credibility_result.get('credibility_score', 0.0) / 100.0
                 }
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG: Exception calling credibility predictor: {e}", flush=True)
+        sys.stdout.flush()
         credibility_result = None
 
     # Analysis-based ensemble for final prediction
@@ -132,8 +172,8 @@ def predict():
         if classifier_result and classifier_result.get('prediction'):
             pred = str(classifier_result.get('prediction')).lower()
             conf = float(classifier_result.get('confidence', 0.0))
-            if conf > 0.1:
-                is_p_fake = ('fake' in pred or 'false' in pred)
+            if conf > 0.05: # Lower threshold to catch more signals
+                is_p_fake = any(x in pred for x in ['fake', 'false', 'නොමඟ', 'අසත්‍ය'])
                 # Weighted higher if certainty is high
                 weight = 1.0 if conf > 0.8 else 0.7
                 signals.append({'is_fake': is_p_fake, 'conf': conf, 'weight': weight, 'source': 'classifier'})
@@ -141,18 +181,18 @@ def predict():
         # 2. Similarity Matcher Signal (Strongest if match found)
         if similarity_result and similarity_result.get('final_verdict'):
             fv = similarity_result.get('final_verdict', '').lower()
-            conf = similarity_result.get('confidence', 0.0)
+            conf = float(similarity_result.get('confidence', 0.0))
             # Only count as a signal if it actually found a match
             if conf > 0.1 and "no match" not in fv:
-                is_s_fake = ('false' in fv or 'fake' in fv)
+                is_s_fake = any(x in fv for x in ['fake', 'false', 'අසත්‍ය'])
                 # Similarity matches are very strong signals
                 signals.append({'is_fake': is_s_fake, 'conf': conf, 'weight': 1.2, 'source': 'similarity'})
 
         # 3. Credibility Signal (Supporting)
         if credibility_result and credibility_result.get('credibility'):
             cl = credibility_result.get('credibility', '').lower()
-            conf = credibility_result.get('confidence', 0.0)
-            is_c_fake = ('low' in cl or 'not' in cl or 'un' in cl or 'medium' in cl)
+            conf = float(credibility_result.get('confidence', 0.0))
+            is_c_fake = any(x in cl for x in ['low', 'not', 'un', 'medium', 'අඩු', 'මධ්‍යම'])
             # Only weight credibility significantly if it's very low or very high
             weight = 0.5
             if 'low' in cl: weight = 0.8
@@ -162,27 +202,33 @@ def predict():
         if signals:
             fake_score = sum(s['conf'] * s['weight'] for s in signals if s['is_fake'])
             real_score = sum(s['conf'] * s['weight'] for s in signals if not s['is_fake'])
-            total_weight = sum(s['weight'] for s in signals)
             
             if fake_score > real_score:
                 final_prediction = "Fake"
-                final_confidence = fake_score / sum(s['weight'] for s in signals if s['is_fake'])
+                # Use total weight of fake signals for average confidence
+                relevant_weights = sum(s['weight'] for s in signals if s['is_fake'])
+                final_confidence = fake_score / relevant_weights if relevant_weights > 0 else 0.0
             elif real_score > fake_score:
                 final_prediction = "Real"
-                final_confidence = real_score / sum(s['weight'] for s in signals if not s['is_fake'])
+                # Use total weight of real signals for average confidence
+                relevant_weights = sum(s['weight'] for s in signals if not s['is_fake'])
+                final_confidence = real_score / relevant_weights if relevant_weights > 0 else 0.0
             else:
                 # Tie break or fallback
+                # If there's a tie but we have signals, usually favor the classifier or pick one
                 final_prediction = "Unknown"
                 final_confidence = 0.0
                 
-            # Normalize confidence to not exceed 100% (though weighted averages naturally stay within range)
+            # Normalize confidence to not exceed 1.0
             final_confidence = min(final_confidence, 1.0)
         else:
             final_prediction = "Unknown"
+            final_confidence = 0.0
 
     except Exception as e:
         print(f"Error in ensemble calculation: {e}")
         final_prediction = 'Unknown'
+        final_confidence = 0.0
 
     result = {
         "language": language,
@@ -197,7 +243,12 @@ def predict():
 
 
 if __name__ == "__main__":
-    # Define services to start (paths assume repo layout). Set ORCHESTRATOR_START_SERVICES=0 to skip.
+    # Define services using loopback address for consistency
+    TAMIL_CLASSIFIER_URL = "http://127.0.0.1:1000"
+    SINHALA_CLASSIFIER_URL = "http://127.0.0.1:2000"
+    SIMILARITY_MATCHER_URL = "http://127.0.0.1:3000"
+    CREDIBILITY_PREDICTOR_URL = "http://127.0.0.1:4000"
+
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     services = [
         {
@@ -226,4 +277,4 @@ if __name__ == "__main__":
                 # best-effort; orchestrator should still run even if child services fail to start
                 pass
 
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
