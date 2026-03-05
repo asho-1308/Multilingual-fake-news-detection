@@ -80,4 +80,4 @@ def predict():
 # --- 5. Run Server ---
 if __name__ == '__main__':
     print(f"🚀 Backend running on http://localhost:{PORT}")
-    app.run(host='0.0.0.0', port=PORT)
+    app.run(host='0.0.0.0', port=PORT, use_reloader=False)
