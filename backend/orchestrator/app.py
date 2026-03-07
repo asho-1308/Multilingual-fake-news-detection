@@ -150,12 +150,8 @@ def predict():
             credibility_result = resp.json()
             print(f"DEBUG: Credibility raw response: {credibility_result}", flush=True)
             sys.stdout.flush()
-            # Normalize credibility response
-            if 'prediction_label' in credibility_result:
-                credibility_result = {
-                    'credibility': credibility_result['prediction_label'],
-                    'confidence': credibility_result.get('credibility_score', 0.0) / 100.0
-                }
+            # Pass through the full high-precision result for the frontend
+            # The ensemble still gets its normalized values below
     except Exception as e:
         print(f"DEBUG: Exception calling credibility predictor: {e}", flush=True)
         sys.stdout.flush()
@@ -189,9 +185,10 @@ def predict():
                 signals.append({'is_fake': is_s_fake, 'conf': conf, 'weight': 1.2, 'source': 'similarity'})
 
         # 3. Credibility Signal (Supporting)
-        if credibility_result and credibility_result.get('credibility'):
-            cl = credibility_result.get('credibility', '').lower()
-            conf = float(credibility_result.get('confidence', 0.0))
+        if credibility_result:
+            cl = str(credibility_result.get('prediction_label', '')).lower()
+            cs = float(credibility_result.get('credibility_score', 0.0))
+            conf = cs / 100.0
             is_c_fake = any(x in cl for x in ['low', 'not', 'un', 'medium', 'අඩු', 'මධ්‍යම'])
             # Only weight credibility significantly if it's very low or very high
             weight = 0.5

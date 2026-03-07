@@ -29,8 +29,14 @@ interface SimilarityResult {
 }
 
 interface CredibilityResult {
-  credibility: string;
-  confidence: number;
+  prediction_label: string;
+  credibility_score: number;
+  sensitivity_metrics?: {
+    linguistic_impact: string;
+    real_news_ratio: string;
+    domain_authority: string;
+    social_reach: string;
+  };
 }
 
 interface PredictionResponse {
@@ -251,28 +257,51 @@ const Prediction = () => {
             )}
 
             {result.credibility && (
-                 <Card>
-                 <CardHeader>
-                   <CardTitle>Source Credibility</CardTitle>
-                 </CardHeader>
-                 <CardContent>
-                   <div className="flex items-center gap-2">
-                     Source Status:{" "}
-                     <Badge
-                       variant={
-                         result.credibility.credibility.toLowerCase() === "high" || result.credibility.credibility.toLowerCase() === "credible"
-                           ? "default"
-                           : "destructive"
-                       }
-                     >
-                       {result.credibility.credibility}
-                     </Badge>
-                   </div>
-                   <div className="text-sm text-muted-foreground mt-1">
-                     Trust Score: {(result.credibility.confidence * 100).toFixed(2)}%
-                   </div>
-                 </CardContent>
-               </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Source Credibility Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Status:</span>
+                      <Badge
+                        variant={
+                          result.credibility.prediction_label.toLowerCase() === "high"
+                            ? "default"
+                            : "destructive"
+                        }
+                      >
+                        {result.credibility.prediction_label}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Overall Trust Score:</span>
+                      <span className="text-lg font-bold">
+                        {result.credibility.credibility_score.toFixed(4)}%
+                      </span>
+                    </div>
+
+                    {result.credibility.sensitivity_metrics && (
+                      <div className="pt-2 border-t grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                        <div>
+                          <strong>Language Impact:</strong> {result.credibility.sensitivity_metrics.linguistic_impact}
+                        </div>
+                        <div>
+                          <strong>News Ratio:</strong> {result.credibility.sensitivity_metrics.real_news_ratio}
+                        </div>
+                        <div>
+                          <strong>Authority (Age):</strong> {result.credibility.sensitivity_metrics.domain_authority}
+                        </div>
+                        <div>
+                          <strong>Social Reach:</strong> {result.credibility.sensitivity_metrics.social_reach}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             <Card>
