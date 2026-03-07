@@ -114,9 +114,7 @@
       const details = [];
       if (data.similarity && data.similarity.final_verdict) {
         const sv = data.similarity.final_verdict;
-        if (sv !== "No Match") {
-          details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">🔍</span><span><strong>Similarity:</strong> ${sv}</span></div>`);
-        }
+        details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">🔍</span><span><strong>Similarity:</strong> ${sv}</span></div>`);
       }
       if (data.credibility && data.credibility.credibility && data.credibility.credibility !== "Unknown") {
         details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">⚖️</span><span><strong>Source:</strong> ${data.credibility.credibility}</span></div>`);
