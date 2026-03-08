@@ -112,14 +112,24 @@ class SemanticVerifierService:
         if not results:
             return "No Match", 0.0
 
-        true_count = sum(1 for r in results if r["verdict"] in ["True", "Partly True"])
-        false_count = sum(1 for r in results if r["verdict"] == "False")
+        # Only count results with a high enough similarity to be meaningful
+        # Threshold can be adjusted based on model performance (0.6 is a safe starting point for LaBSE normalized)
+        significant_results = [r for r in results if r["similarity"] > 0.6]
+        
+        if not significant_results:
+            # If we have some results but they are weak, return Uncertain instead of No Match
+            return "UNCERTAIN", 0.3 if results else 0.0
+
+        true_count = sum(1 for r in significant_results if r["verdict"] in ["True", "Partly True"])
+        false_count = sum(1 for r in significant_results if r["verdict"] in ["False", "Likely False"])
 
         if true_count > false_count:
-            return "Likely TRUE", round(true_count / len(results), 4)
+            # If mostly True, but some False, it's still likely True but with lower confidence
+            return "Likely TRUE", round(true_count / len(significant_results), 4)
         if false_count > true_count:
-            return "Likely FALSE", round(false_count / len(results), 4)
-
+            return "Likely FALSE", round(false_count / len(significant_results), 4)
+        
+        # If it's a tie among significant results (e.g. 1 True, 1 False)
         return "UNCERTAIN", 0.5
 
     def verify(self, claim: str, top_k: int = None):
