@@ -134,14 +134,17 @@ def predict():
     # Call credibility predictor for all requests
     credibility_result = None
     try:
+        # Map detected language to what credibility predictor expects (English/Tamil/Sinhala)
+        cred_lang = language.capitalize() if language in ["tamil", "sinhala", "english"] else "English"
+        
         cred_payload = {
             "past_fake": data.get("past_fake", 0),
             "past_real": data.get("past_real", 0),
             "domain_age_years": data.get("domain_age_years", 0),
             "followers": data.get("followers", 0),
-            "language": language
+            "language": cred_lang
         }
-        print(f"DEBUG: Calling Credibility Predictor at {CREDIBILITY_PREDICTOR_URL}", flush=True)
+        print(f"DEBUG: Calling Credibility Predictor at {CREDIBILITY_PREDICTOR_URL} with lang: {cred_lang}", flush=True)
         sys.stdout.flush()
         resp = requests.post(f"{CREDIBILITY_PREDICTOR_URL}/predict", json=cred_payload, timeout=30)
         print(f"DEBUG: Credibility response status: {resp.status_code}", flush=True)

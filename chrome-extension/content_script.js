@@ -116,8 +116,12 @@
         const sv = data.similarity.final_verdict;
         details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">🔍</span><span><strong>Similarity:</strong> ${sv}</span></div>`);
       }
-      if (data.credibility && data.credibility.credibility && data.credibility.credibility !== "Unknown") {
-        details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">⚖️</span><span><strong>Source:</strong> ${data.credibility.credibility}</span></div>`);
+      
+      // Credibility Predictor results
+      if (data.credibility) {
+        const cLabel = data.credibility.prediction_label || "Unknown";
+        const cScore = data.credibility.credibility_score != null ? data.credibility.credibility_score.toFixed(1) : "0";
+        details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">⚖️</span><span><strong>Credibility:</strong> ${cLabel} (${cScore}%)</span></div>`);
       }
 
       const content = `
