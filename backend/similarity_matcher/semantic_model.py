@@ -57,10 +57,15 @@ class SemanticVerifierService:
                 print("⚠️ Failed loading local model. Fallback to pretrained.")
                 print("Reason:", e)
 
-        # ✅ fallback to online pretrained (with token)
+        # ✅ fallback to online pretrained
         if self.model is None:
             print("🔧 Loading pretrained model:", self.model_name)
-            self.model = SentenceTransformer(self.model_name, token=hf_token)
+            try:
+                # Try without token for compatibility with older SentenceTransformer versions
+                self.model = SentenceTransformer(self.model_name)
+            except TypeError:
+                # Fallback if it somehow expects token but failed above
+                self.model = SentenceTransformer(self.model_name, use_auth_token=hf_token)
             print("✅ Loaded pretrained model.")
 
         # Load FAISS index

@@ -35,8 +35,8 @@ const SemanticSimilarityMatcher = () => {
     setError("");
 
     try {
-      // Assuming similarity matcher runs on port 5001
-      const response = await fetch("http://localhost:3000/api/verify", {
+      // The Similarity Matcher service runs on port 3000
+      const response = await fetch("http://127.0.0.1:3000/api/verify", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
