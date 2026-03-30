@@ -147,46 +147,51 @@ class SemanticVerifierService:
     def _scrape_online_news(self, claim: str):
         """Scrapes online news via SerpApi if no match is found in CSV."""
         if not self.serpapi_key or self.serpapi_key == "YOUR_SERP_API_KEY_HERE":
-            print("⚠️ SerpApi key not configured. Skipping online search.")
+            print(f"DEBUG: [SM] ⚠️ SerpApi key not configured or placeholder used. Key found: '{self.serpapi_key[:5]}...'")
             return []
 
-        print(f"🔍 Searching online for: {claim}")
+        print(f"DEBUG: [SM] 🔍 Searching online for: {claim}")
         try:
             params = {
                 "q": claim,
                 "tbm": "nws",  # News search
                 "api_key": self.serpapi_key,
-                "num": 2  # Reduced to absolute minimum for speed
+                "num": 3
             }
             # Give the external API more time
             response = requests.get("https://serpapi.com/search", params=params, timeout=15)
+            print(f"DEBUG: [SM] SerpApi response status: {response.status_code}")
+            
             if response.status_code != 200:
-                print(f"⚠️ SerpApi failed with status {response.status_code}")
+                print(f"DEBUG: [SM] ⚠️ SerpApi failed with status {response.status_code}. Response: {response.text[:200]}")
                 return []
 
             data = response.json()
             news_results = data.get("news_results", [])
+            print(f"DEBUG: [SM] Found {len(news_results)} news results from SerpApi")
             
             online_neighbors = []
-            # Stop after 2 results to save time on encoding
-            for item in news_results[:2]:
+            # Encode claim once outside the loop
+            emb_claim = self.model.encode([claim], convert_to_numpy=True).astype("float32")
+            faiss.normalize_L2(emb_claim)
+
+            for item in news_results[:3]:
                 title = item.get("title", "")
                 link = item.get("link", "")
                 source = item.get("source", "Online News")
                 
                 # Calculate similarity for the online title
-                emb_claim = self.model.encode([claim], convert_to_numpy=True).astype("float32")
                 emb_title = self.model.encode([title], convert_to_numpy=True).astype("float32")
-                faiss.normalize_L2(emb_claim)
                 faiss.normalize_L2(emb_title)
                 
                 # Dot product of normalized vectors = Cosine Similarity
                 sim = float(np.dot(emb_claim, emb_title.T)[0][0])
+                print(f"DEBUG: [SM] Online match: '{title[:30]}...' Similarity: {sim:.4f}")
                 
                 online_neighbors.append({
                     "similarity": sim,
                     "claim": title,
-                    "verdict": "News Article", # Online articles are typically informational
+                    "verdict": "News Article", 
                     "source": source,
                     "url": link,
                     "is_online": True
@@ -196,7 +201,9 @@ class SemanticVerifierService:
             online_neighbors.sort(key=lambda x: x['similarity'], reverse=True)
             return online_neighbors
         except Exception as e:
-            print(f"⚠️ Online search error: {e}")
+            print(f"DEBUG: [SM] ⚠️ Online search error: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def verify(self, claim: str, top_k: int = None):

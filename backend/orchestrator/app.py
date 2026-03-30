@@ -129,10 +129,12 @@ def predict_light():
 
     if similarity_result and similarity_result.get('neighbors'):
         neighbors = similarity_result['neighbors']
+        print(f"DEBUG: [ORC] Found {len(neighbors)} neighbors in similarity response", flush=True)
         best_match = max(neighbors, key=lambda x: x['similarity']) if neighbors else None
         
-        if best_match and best_match['similarity'] > 0.1:
+        if best_match:
             s_conf = float(best_match['similarity'])
+            print(f"DEBUG: [ORC] Best similarity match: {s_conf}", flush=True)
             s_verdict = str(best_match.get('verdict', '')).lower()
             
             # Treat "News Article" (from Online Search) as REAL
@@ -141,9 +143,12 @@ def predict_light():
             if "news article" in s_verdict or "verified real" in s_verdict:
                 is_s_fake = False
 
-            # High weight because exact matches are very reliable for the extension
-            s_weight = 2.0 if s_conf > 0.9 else 1.5
+            # Even low similarity matches provide a signal if they are from the online search
+            # We want to show THEM in the extension even if they don't strongly confirm FAKE/REAL
+            s_weight = 2.0 if s_conf > 0.8 else 1.0
             signals.append({'is_fake': is_s_fake, 'conf': s_conf, 'weight': s_weight})
+    else:
+        print(f"DEBUG: [ORC] No neighbors found in similarity result", flush=True)
 
     if signals:
         total_weight = sum(s['weight'] for s in signals)
