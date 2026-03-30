@@ -104,35 +104,41 @@
       });
       if (!resp.ok) throw new Error(`Status ${resp.status}`);
       const data = await resp.json();
+      console.log('DEBUG: Extension received data:', data);
       
       const pred = data.final_prediction || 'Unknown';
       const isFake = pred.toLowerCase() === 'fake';
       const isReal = pred.toLowerCase() === 'real';
       const colorClass = isFake ? 'fnd-fake' : (isReal ? 'fnd-real' : '');
-      const confValue = (data.final_confidence * 100).toFixed(0) || '0';
+      const confValue = data.final_confidence != null ? (data.final_confidence * 100).toFixed(0) : '0';
       
       const details = [];
       const hasNeighbors = data.similarity && data.similarity.neighbors && Array.isArray(data.similarity.neighbors) && data.similarity.neighbors.length > 0;
       
+      console.log('DEBUG: hasNeighbors?', hasNeighbors, 'neighbors count:', data.similarity?.neighbors?.length);
+
       if (hasNeighbors) {
-        const best = data.similarity.neighbors[0];
-        // Ensure similarity is a valid number before using toFixed
-        const rawSim = parseFloat(best.similarity);
-        const simPercent = (!isNaN(rawSim) ? (rawSim * 100).toFixed(1) : "0.0");
-        const sourceName = best.source || 'Unknown Source';
-        const newsLink = best.url || '#';
-        const isOnline = best.is_online ? ' (Live)' : '';
-        
-        details.push(`
-          <div class="fnd-detail-item">
-            <span class="fnd-detail-icon">🔗</span>
-            <span><strong>${simPercent}% Match:</strong> ${sourceName}${isOnline}</span>
-          </div>
-          <div style="margin-top:2px;">
-            <a href="${newsLink}" target="_blank" style="color: #2563eb; font-size: 11px; text-decoration: underline;">Read Original Article</a>
-          </div>
-        `);
-      } else if (data.similarity && data.similarity.final_verdict && data.similarity.final_verdict !== "No Match") {
+        // Collect all neighbors to display
+        data.similarity.neighbors.forEach((neighbor, idx) => {
+          const rawSim = parseFloat(neighbor.similarity);
+          const simPercent = (!isNaN(rawSim) ? (rawSim * 100).toFixed(1) : "0.0");
+          const sourceName = neighbor.source || 'Unknown Source';
+          const newsLink = neighbor.url || '#';
+          const isOnlineLabel = neighbor.is_online ? ' <span style="color:#ef4444; font-size:9px;">(Live)</span>' : '';
+          const verdictText = neighbor.verdict || 'Article';
+          
+          details.push(`
+            <div class="fnd-detail-item" style="margin-bottom: 8px; border-left: 2px solid #e2e8f0; padding-left: 6px;">
+              <span class="fnd-detail-icon">🔗</span>
+              <div>
+                <div style="font-weight: 700; font-size: 11px;">${simPercent}% Match: ${sourceName}${isOnlineLabel}</div>
+                <div style="font-size: 10px; color: #64748b; margin-top: 1px;">Verdict: ${verdictText}</div>
+                <a href="${newsLink}" target="_blank" style="color: #2563eb; font-size: 11px; text-decoration: underline;">Read Original Article</a>
+              </div>
+            </div>
+          `);
+        });
+      } else if (data.similarity && data.similarity.final_verdict && data.similarity.final_verdict !== "No Match" && data.similarity.final_verdict !== "UNCERTAIN") {
         details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">🔍</span><span><strong>Similarity:</strong> ${data.similarity.final_verdict}</span></div>`);
       }
 
