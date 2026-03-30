@@ -112,18 +112,37 @@
       const confValue = (data.final_confidence * 100).toFixed(0) || '0';
       
       const details = [];
-      if (data.similarity && data.similarity.final_verdict) {
-        const sv = data.similarity.final_verdict;
-        details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">🔍</span><span><strong>Similarity:</strong> ${sv}</span></div>`);
+      const hasNeighbors = data.similarity && data.similarity.neighbors && Array.isArray(data.similarity.neighbors) && data.similarity.neighbors.length > 0;
+      
+      if (hasNeighbors) {
+        const best = data.similarity.neighbors[0];
+        // Ensure similarity is a valid number before using toFixed
+        const rawSim = parseFloat(best.similarity);
+        const simPercent = (!isNaN(rawSim) ? (rawSim * 100).toFixed(1) : "0.0");
+        const sourceName = best.source || 'Unknown Source';
+        const newsLink = best.url || '#';
+        const isOnline = best.is_online ? ' (Live)' : '';
+        
+        details.push(`
+          <div class="fnd-detail-item">
+            <span class="fnd-detail-icon">🔗</span>
+            <span><strong>${simPercent}% Match:</strong> ${sourceName}${isOnline}</span>
+          </div>
+          <div style="margin-top:2px;">
+            <a href="${newsLink}" target="_blank" style="color: #2563eb; font-size: 11px; text-decoration: underline;">Read Original Article</a>
+          </div>
+        `);
+      } else if (data.similarity && data.similarity.final_verdict && data.similarity.final_verdict !== "No Match") {
+        details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">🔍</span><span><strong>Similarity:</strong> ${data.similarity.final_verdict}</span></div>`);
       }
 
       const content = `
-        <div class="fnd-title">Verification Result</div>
+        <div class="fnd-title">Verification Results</div>
         <div class="fnd-result">
           <div class="fnd-prediction ${colorClass}">${pred}</div>
-          <div class="fnd-confidence">${confValue}% Confidence balance</div>
+          <div class="fnd-confidence">${confValue}% Final Confidence</div>
         </div>
-        ${details.length ? `<div class="fnd-details">${details.join('')}</div>` : '<div style="font-size:11px; color:#64748b; font-style:italic; margin-top:8px">No match found in database</div>'}
+        ${details.length > 0 ? `<div class="fnd-details">${details.join('')}</div>` : '<div style="font-size:11px; color:#64748b; font-style:italic; margin-top:8px">No matching news found in record</div>'}
       `;
       
       showOverlay(el, content);
@@ -142,13 +161,9 @@
     const candidates = uniq.filter(el => {
       const t = (el.innerText || '').trim();
       if (!t || t.length < 4) return false;
+      // ONLY analyze if the text contains Tamil or Sinhala characters
       if (isTamil(t) || isSinhala(t)) return true;
-      try {
-        const fs = parseFloat(window.getComputedStyle(el).fontSize) || 0;
-        if (fs >= 18) return true;
-      } catch(e) {}
-      const cls = (el.className || '') + ' ' + (el.id || '');
-      return /title|headline|heading/i.test(cls);
+      return false; // Skip all other languages (English, etc.)
     });
 
     const texts = candidates.map(e => (e.innerText || '').trim());

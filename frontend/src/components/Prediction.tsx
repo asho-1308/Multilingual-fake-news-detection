@@ -95,6 +95,17 @@ const Prediction = () => {
       }
 
       const data: PredictionResponse = await response.json();
+      
+      if (data.final_prediction === "Ignored") {
+        toast({
+          title: "Language Not Supported",
+          description: "This tool only supports analysis for Tamil and Sinhala news content.",
+          variant: "destructive",
+        });
+        setResult(null);
+        return;
+      }
+      
       setResult(data);
     } catch (error) {
       console.error("Failed to fetch prediction:", error);

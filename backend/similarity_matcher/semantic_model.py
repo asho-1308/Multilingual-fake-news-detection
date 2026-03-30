@@ -120,19 +120,24 @@ class SemanticVerifierService:
             return "No Match", 0.0
 
         # Only count results with a high enough similarity to be meaningful
-        # Threshold can be adjusted based on model performance (0.6 is a safe starting point for LaBSE normalized)
-        significant_results = [r for r in results if r["similarity"] > 0.6]
+        # A match > 0.9 is almost certainly the same story
+        # A match > 0.7 is likely the same topic
+        best_sim = results[0]["similarity"] if results else 0.0
         
-        if not significant_results:
-            # If we have some results but they are weak, return Uncertain instead of No Match
-            return "UNCERTAIN", 0.3 if results else 0.0
+        if best_sim > 0.8:
+            # If the best match is very high, use its specific verdict
+            top_verdict = results[0].get("verdict", "Unknown")
+            if any(x in top_verdict.lower() for x in ["true", "article", "real", "සත්‍ය"]):
+                return "VERIFIED REAL", round(best_sim, 4)
+            if any(x in top_verdict.lower() for x in ["false", "fake", "fake news", "අසත්‍ය"]):
+                return "VERIFIED FAKE", round(best_sim, 4)
+            return "MATCH FOUND", round(best_sim, 4)
 
-        true_count = sum(1 for r in significant_results if r["verdict"] in ["True", "Partly True"])
-        false_count = sum(1 for r in significant_results if r["verdict"] in ["False", "Likely False"])
+        if best_sim < 0.5:
+            return "UNCERTAIN", 0.3
 
-        if true_count > false_count:
-            # If mostly True, but some False, it's still likely True but with lower confidence
-            return "Likely TRUE", round(true_count / len(significant_results), 4)
+        # For middle-range similarities (0.5 to 0.8), use the weighted logic
+        significant_results = [r for r in results if r["similarity"] > 0.5]
         if false_count > true_count:
             return "Likely FALSE", round(false_count / len(significant_results), 4)
         
@@ -151,9 +156,10 @@ class SemanticVerifierService:
                 "q": claim,
                 "tbm": "nws",  # News search
                 "api_key": self.serpapi_key,
-                "num": 5
+                "num": 2  # Reduced to absolute minimum for speed
             }
-            response = requests.get("https://serpapi.com/search", params=params, timeout=10)
+            # Give the external API more time
+            response = requests.get("https://serpapi.com/search", params=params, timeout=15)
             if response.status_code != 200:
                 print(f"⚠️ SerpApi failed with status {response.status_code}")
                 return []
@@ -162,7 +168,8 @@ class SemanticVerifierService:
             news_results = data.get("news_results", [])
             
             online_neighbors = []
-            for item in news_results:
+            # Stop after 2 results to save time on encoding
+            for item in news_results[:2]:
                 title = item.get("title", "")
                 link = item.get("link", "")
                 source = item.get("source", "Online News")
@@ -203,10 +210,10 @@ class SemanticVerifierService:
         
         # Trigger online scraping if no strong match in CSV
         # Threshold: if the best single match is < 0.6, try online
-        best_sim = neighbors[0]['similarity'] if neighbors else 0
+        best_sim_csv = neighbors[0]['similarity'] if neighbors else 0
         is_fallback = False
         
-        if best_sim < 0.6:
+        if best_sim_csv < 0.6:
             online_neighbors = self._scrape_online_news(claim)
             if online_neighbors:
                 # Merge and keep top_k best results overall
@@ -214,6 +221,13 @@ class SemanticVerifierService:
                 is_fallback = True
 
         final_verdict, confidence = self._aggregate_verdict(neighbors)
+
+        # If Online Scraper found a match and aggregate didn't catch it
+        if is_fallback and neighbors and neighbors[0].get('is_online'):
+            best_sim = neighbors[0]['similarity']
+            if best_sim > 0.6:
+                final_verdict = "VERIFIED REAL (ONLINE)"
+                confidence = best_sim
 
         return {
             "input_claim": claim,
