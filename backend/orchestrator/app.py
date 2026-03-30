@@ -280,14 +280,21 @@ def predict():
                 signals.append({'is_fake': is_p_fake, 'conf': conf, 'weight': weight, 'source': 'classifier'})
 
         # 2. Similarity Matcher Signal (Strongest if match found)
-        if similarity_result and similarity_result.get('final_verdict'):
-            fv = similarity_result.get('final_verdict', '').lower()
-            conf = float(similarity_result.get('confidence', 0.0))
-            # Only count as a signal if it actually found a match
-            if conf > 0.1 and "no match" not in fv:
-                is_s_fake = any(x in fv for x in ['fake', 'false', 'අසත්‍ය'])
-                # Similarity matches are very strong signals
-                signals.append({'is_fake': is_s_fake, 'conf': conf, 'weight': 1.2, 'source': 'similarity'})
+        if similarity_result and similarity_result.get('neighbors'):
+            neighbors = similarity_result['neighbors']
+            # Find the match with the highest similarity
+            best_match = max(neighbors, key=lambda x: x['similarity']) if neighbors else None
+            
+            if best_match and best_match['similarity'] > 0.1:
+                s_conf = float(best_match['similarity'])
+                s_verdict = str(best_match.get('verdict', '')).lower()
+                
+                # If we found an actual news article or a verified TRUE source, it is REAL
+                is_s_fake = any(x in s_verdict for x in ['fake', 'false', 'අසත්‍ය'])
+                
+                # Boost weight for 100% matches to ensure they dominate the result
+                s_weight = 2.0 if s_conf > 0.9 else 1.2
+                signals.append({'is_fake': is_s_fake, 'conf': s_conf, 'weight': s_weight, 'source': 'similarity_max'})
 
         # 3. Credibility Signal (Supporting)
         if credibility_result:
@@ -302,22 +309,19 @@ def predict():
             signals.append({'is_fake': is_c_fake, 'conf': conf, 'weight': weight, 'source': 'credibility'})
 
         if signals:
+            total_weight = sum(s['weight'] for s in signals)
             fake_score = sum(s['conf'] * s['weight'] for s in signals if s['is_fake'])
             real_score = sum(s['conf'] * s['weight'] for s in signals if not s['is_fake'])
             
+            print(f"DEBUG: ENSEMBLE SUMMARY - Fake: {fake_score}, Real: {real_score}, Total Weight: {total_weight}", flush=True)
+
             if fake_score > real_score:
                 final_prediction = "Fake"
-                # Use total weight of fake signals for average confidence
-                relevant_weights = sum(s['weight'] for s in signals if s['is_fake'])
-                final_confidence = fake_score / relevant_weights if relevant_weights > 0 else 0.0
+                final_confidence = fake_score / total_weight
             elif real_score > fake_score:
                 final_prediction = "Real"
-                # Use total weight of real signals for average confidence
-                relevant_weights = sum(s['weight'] for s in signals if not s['is_fake'])
-                final_confidence = real_score / relevant_weights if relevant_weights > 0 else 0.0
+                final_confidence = real_score / total_weight
             else:
-                # Tie break or fallback
-                # If there's a tie but we have signals, usually favor the classifier or pick one
                 final_prediction = "Unknown"
                 final_confidence = 0.0
                 
