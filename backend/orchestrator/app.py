@@ -187,6 +187,14 @@ def predict():
     print(f"DEBUG: Detected language: {language}", flush=True)
     sys.stdout.flush()
 
+    if language not in ["tamil", "sinhala"]:
+        return jsonify({
+            "error": "Prediction only supported for Tamil and Sinhala.",
+            "language": language,
+            "final_prediction": "Ignored",
+            "final_confidence": 0.0
+        }), 200
+
     # Forward to language-specific classifier when available
     classifier_result = None
     try:
