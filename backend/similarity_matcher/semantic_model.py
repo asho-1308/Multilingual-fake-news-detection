@@ -119,13 +119,9 @@ class SemanticVerifierService:
         if not results:
             return "No Match", 0.0
 
-        # Only count results with a high enough similarity to be meaningful
-        # A match > 0.9 is almost certainly the same story
-        # A match > 0.7 is likely the same topic
         best_sim = results[0]["similarity"] if results else 0.0
         
         if best_sim > 0.8:
-            # If the best match is very high, use its specific verdict
             top_verdict = results[0].get("verdict", "Unknown")
             if any(x in top_verdict.lower() for x in ["true", "article", "real", "සත්‍ය"]):
                 return "VERIFIED REAL", round(best_sim, 4)
@@ -136,12 +132,14 @@ class SemanticVerifierService:
         if best_sim < 0.5:
             return "UNCERTAIN", 0.3
 
-        # For middle-range similarities (0.5 to 0.8), use the weighted logic
+        # For middle-range similarities (0.5 to 0.8), count the verdicts
         significant_results = [r for r in results if r["similarity"] > 0.5]
+        false_count = sum(1 for r in significant_results if any(x in r["verdict"].lower() for x in ["false", "fake", "අසත්‍ය"]))
+        true_count = sum(1 for r in significant_results if any(x in r["verdict"].lower() for x in ["true", "real", "සත්‍ය"]))
+
         if false_count > true_count:
             return "Likely FALSE", round(false_count / len(significant_results), 4)
         
-        # If it's a tie among significant results (e.g. 1 True, 1 False)
         return "UNCERTAIN", 0.5
 
     def _scrape_online_news(self, claim: str):
@@ -150,13 +148,22 @@ class SemanticVerifierService:
             print(f"DEBUG: [SM] ⚠️ SerpApi key not configured or placeholder used. Key found: '{self.serpapi_key[:5]}...'")
             return []
 
-        print(f"DEBUG: [SM] 🔍 Searching online for: {claim}")
+        # Enhance query for Tamil/Sinhala to get better results
+        lang = detect_language_safe(claim)
+        search_query = claim
+        if lang == "ta" and "tamil" not in claim.lower():
+            search_query += " news tamil"
+        elif lang == "si" and "sinhala" not in claim.lower():
+            search_query += " news sinhala"
+
+        print(f"DEBUG: [SM] 🔍 Searching online for: {search_query} (Orig: {claim})")
         try:
             params = {
-                "q": claim,
+                "q": search_query,
                 "tbm": "nws",  # News search
                 "api_key": self.serpapi_key,
-                "num": 3
+                "num": 5, # Fetch more to find better matches
+                "gl": "lk" if lang in ["ta", "si"] else "us" # Target Sri Lanka for local news
             }
             # Give the external API more time
             response = requests.get("https://serpapi.com/search", params=params, timeout=15)
@@ -175,7 +182,8 @@ class SemanticVerifierService:
             emb_claim = self.model.encode([claim], convert_to_numpy=True).astype("float32")
             faiss.normalize_L2(emb_claim)
 
-            for item in news_results[:3]:
+            # Process top 5 results for higher match probability
+            for item in news_results[:5]:
                 title = item.get("title", "")
                 link = item.get("link", "")
                 source = item.get("source", "Online News")
@@ -216,23 +224,26 @@ class SemanticVerifierService:
         neighbors = self._semantic_search_unique(claim, top_k=top_k, max_candidates=max_candidates)
         
         # Trigger online scraping if no strong match in CSV
-        # Threshold: if the best single match is < 0.6, try online
+        # Threshold: if the best single match is < 0.7, try online
         best_sim_csv = neighbors[0]['similarity'] if neighbors else 0
         is_fallback = False
         
-        if best_sim_csv < 0.6:
+        if best_sim_csv < 0.7:
+            print(f"DEBUG: [SM] Best CSV match ({best_sim_csv:.4f}) below threshold 0.7. Triggering Online Search...")
             online_neighbors = self._scrape_online_news(claim)
             if online_neighbors:
                 # Merge and keep top_k best results overall
                 neighbors = sorted(online_neighbors + neighbors, key=lambda x: x['similarity'], reverse=True)[:top_k]
                 is_fallback = True
+            else:
+                print("DEBUG: [SM] No online news results found/matched.")
 
         final_verdict, confidence = self._aggregate_verdict(neighbors)
 
         # If Online Scraper found a match and aggregate didn't catch it
         if is_fallback and neighbors and neighbors[0].get('is_online'):
             best_sim = neighbors[0]['similarity']
-            if best_sim > 0.6:
+            if best_sim > 0.5: # Lower threshold to favor online news over "Uncertain"
                 final_verdict = "VERIFIED REAL (ONLINE)"
                 confidence = best_sim
 
