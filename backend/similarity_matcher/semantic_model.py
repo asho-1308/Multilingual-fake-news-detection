@@ -3,6 +3,7 @@ import json
 import numpy as np
 import pandas as pd
 import faiss
+import requests
 
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
@@ -34,6 +35,7 @@ class SemanticVerifierService:
 
         self.top_k_default = int(os.getenv("TOP_K_DEFAULT", "3"))
         self.max_candidates_mult = int(os.getenv("MAX_CANDIDATES_MULT", "5"))
+        self.serpapi_key = os.getenv("SERPAPI_KEY", "").strip()
 
         hf_token = os.getenv("HF_TOKEN", "").strip() or None
 
@@ -137,6 +139,59 @@ class SemanticVerifierService:
         # If it's a tie among significant results (e.g. 1 True, 1 False)
         return "UNCERTAIN", 0.5
 
+    def _scrape_online_news(self, claim: str):
+        """Scrapes online news via SerpApi if no match is found in CSV."""
+        if not self.serpapi_key or self.serpapi_key == "YOUR_SERP_API_KEY_HERE":
+            print("⚠️ SerpApi key not configured. Skipping online search.")
+            return []
+
+        print(f"🔍 Searching online for: {claim}")
+        try:
+            params = {
+                "q": claim,
+                "tbm": "nws",  # News search
+                "api_key": self.serpapi_key,
+                "num": 5
+            }
+            response = requests.get("https://serpapi.com/search", params=params, timeout=10)
+            if response.status_code != 200:
+                print(f"⚠️ SerpApi failed with status {response.status_code}")
+                return []
+
+            data = response.json()
+            news_results = data.get("news_results", [])
+            
+            online_neighbors = []
+            for item in news_results:
+                title = item.get("title", "")
+                link = item.get("link", "")
+                source = item.get("source", "Online News")
+                
+                # Calculate similarity for the online title
+                emb_claim = self.model.encode([claim], convert_to_numpy=True).astype("float32")
+                emb_title = self.model.encode([title], convert_to_numpy=True).astype("float32")
+                faiss.normalize_L2(emb_claim)
+                faiss.normalize_L2(emb_title)
+                
+                # Dot product of normalized vectors = Cosine Similarity
+                sim = float(np.dot(emb_claim, emb_title.T)[0][0])
+                
+                online_neighbors.append({
+                    "similarity": sim,
+                    "claim": title,
+                    "verdict": "News Article", # Online articles are typically informational
+                    "source": source,
+                    "url": link,
+                    "is_online": True
+                })
+            
+            # Sort by similarity
+            online_neighbors.sort(key=lambda x: x['similarity'], reverse=True)
+            return online_neighbors
+        except Exception as e:
+            print(f"⚠️ Online search error: {e}")
+            return []
+
     def verify(self, claim: str, top_k: int = None):
         if top_k is None:
             top_k = self.top_k_default
@@ -145,6 +200,19 @@ class SemanticVerifierService:
 
         lang = detect_language_safe(claim)
         neighbors = self._semantic_search_unique(claim, top_k=top_k, max_candidates=max_candidates)
+        
+        # Trigger online scraping if no strong match in CSV
+        # Threshold: if the best single match is < 0.6, try online
+        best_sim = neighbors[0]['similarity'] if neighbors else 0
+        is_fallback = False
+        
+        if best_sim < 0.6:
+            online_neighbors = self._scrape_online_news(claim)
+            if online_neighbors:
+                # Merge and keep top_k best results overall
+                neighbors = sorted(online_neighbors + neighbors, key=lambda x: x['similarity'], reverse=True)[:top_k]
+                is_fallback = True
+
         final_verdict, confidence = self._aggregate_verdict(neighbors)
 
         return {
@@ -154,4 +222,5 @@ class SemanticVerifierService:
             "confidence": float(confidence),
             "top_k": int(top_k),
             "neighbors": neighbors,
+            "used_online_search": is_fallback
         }
