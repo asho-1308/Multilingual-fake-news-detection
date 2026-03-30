@@ -52,6 +52,108 @@ def health():
     return jsonify({"status": "ok", "message": "Orchestrator service is running"}), 200
 
 
+@app.route("/predict_light", methods=["POST"])
+def predict_light():
+    """Lightweight prediction endpoint for Chrome Extension.
+    Only uses Linguistic Classifier and Similarity Matcher.
+    Ignores Source Credibility.
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    print(f"DEBUG: Processing LIGHT request for text: '{text[:50]}...'", flush=True)
+    sys.stdout.flush()
+    
+    if not text:
+        return jsonify({"error": "Missing or empty 'text' in request"}), 400
+
+    language = detect_language(text)
+    print(f"DEBUG: LIGHT detected language: {language}", flush=True)
+    sys.stdout.flush()
+
+    # 1. Forward to language-specific classifier
+    classifier_result = None
+    try:
+        if language == "tamil":
+            print(f"DEBUG: Calling Tamil Classifier for LIGHT", flush=True)
+            resp = requests.post(f"{TAMIL_CLASSIFIER_URL}/predict", json={"text": text}, timeout=15)
+            if resp.status_code == 200:
+                raw = resp.json()
+                print(f"DEBUG: Tamil raw for LIGHT: {raw}", flush=True)
+                if raw.get('status') == 'success':
+                    classifier_result = {'prediction': raw.get('prediction', ''), 'confidence': raw.get('confidence', 0.0)}
+        elif language == "sinhala":
+            print(f"DEBUG: Calling Sinhala Classifier for LIGHT", flush=True)
+            resp = requests.post(f"{SINHALA_CLASSIFIER_URL}/predict", json={"text": text}, timeout=15)
+            if resp.status_code == 200:
+                raw = resp.json()
+                print(f"DEBUG: Sinhala raw for LIGHT: {raw}", flush=True)
+                classifier_result = {'prediction': raw.get('label', ''), 'confidence': raw.get('confidence', 0.0)}
+    except Exception as e:
+        print(f"DEBUG: Exception in LIGHT classifier call: {e}", flush=True)
+        classifier_result = None
+
+    # 2. Call similarity matcher
+    similarity_result = None
+    try:
+        print(f"DEBUG: Calling Similarity Matcher for LIGHT", flush=True)
+        resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json={"claim": text}, timeout=15)
+        if resp.status_code == 200:
+            similarity_result = resp.json()
+            print(f"DEBUG: Similarity raw for LIGHT: {similarity_result}", flush=True)
+    except Exception as e:
+        print(f"DEBUG: Exception in LIGHT similarity call: {e}", flush=True)
+        similarity_result = None
+
+    # 3. Simple Ensemble (No Credibility)
+    final_prediction = "Unknown"
+    final_confidence = 0.0
+    signals = []
+    
+    if classifier_result and classifier_result.get('prediction'):
+        pred = str(classifier_result.get('prediction')).lower()
+        conf = float(classifier_result.get('confidence', 0.0))
+        # Support various labeling formats
+        is_p_fake = any(x in pred for x in ['fake', 'false', 'නොමඟ', 'අසත්‍ය'])
+        is_p_real = any(x in pred for x in ['real', 'true', 'සත්‍ය'])
+        
+        if is_p_fake or is_p_real:
+            signals.append({'is_fake': is_p_fake, 'conf': conf, 'weight': 1.0})
+
+    if similarity_result and similarity_result.get('final_verdict'):
+        fv = similarity_result.get('final_verdict', '').lower()
+        conf = float(similarity_result.get('confidence', 0.0))
+        # Check neighbors as well if ensemble needs more detail
+        if conf > 0.1 and "no match" not in fv:
+            is_s_fake = any(x in fv for x in ['fake', 'false', 'අසත්‍ය'])
+            signals.append({'is_fake': is_s_fake, 'conf': conf, 'weight': 1.5}) # High weight for similarity
+
+    if signals:
+        total_weight = sum(s['weight'] for s in signals)
+        fake_score = sum(s['conf'] * s['weight'] for s in signals if s['is_fake'])
+        real_score = sum(s['conf'] * s['weight'] for s in signals if not s['is_fake'])
+        
+        print(f"DEBUG: LIGHT Scores - Fake: {fake_score}, Real: {real_score}, Total Weight: {total_weight}", flush=True)
+        
+        if fake_score > real_score:
+            final_prediction = "Fake"
+            final_confidence = fake_score / total_weight
+        elif real_score > fake_score:
+            final_prediction = "Real"
+            final_confidence = real_score / total_weight
+        else:
+            final_prediction = "Unknown"
+            final_confidence = 0.0
+            
+    sys.stdout.flush()
+    return jsonify({
+        "language": language,
+        "final_prediction": final_prediction,
+        "final_confidence": round(min(final_confidence, 1.0), 4),
+        "classifier": classifier_result,
+        "similarity": similarity_result
+    }), 200
+
+
 @app.route("/predict", methods=["POST"])
 def predict():
     data = request.get_json(silent=True) or {}

@@ -97,7 +97,7 @@
     `);
 
     try {
-      const resp = await fetch('http://127.0.0.1:5000/predict', {
+      const resp = await fetch('http://127.0.0.1:5000/predict_light', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: sendText || text })
@@ -109,19 +109,12 @@
       const isFake = pred.toLowerCase() === 'fake';
       const isReal = pred.toLowerCase() === 'real';
       const colorClass = isFake ? 'fnd-fake' : (isReal ? 'fnd-real' : '');
-      const confValue = data.final_confidence != null ? (data.final_confidence * 100).toFixed(0) : '0';
+      const confValue = (data.final_confidence * 100).toFixed(0) || '0';
       
       const details = [];
       if (data.similarity && data.similarity.final_verdict) {
         const sv = data.similarity.final_verdict;
         details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">🔍</span><span><strong>Similarity:</strong> ${sv}</span></div>`);
-      }
-      
-      // Credibility Predictor results
-      if (data.credibility) {
-        const cLabel = data.credibility.prediction_label || "Unknown";
-        const cScore = data.credibility.credibility_score != null ? data.credibility.credibility_score.toFixed(1) : "0";
-        details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">⚖️</span><span><strong>Credibility:</strong> ${cLabel} (${cScore}%)</span></div>`);
       }
 
       const content = `
