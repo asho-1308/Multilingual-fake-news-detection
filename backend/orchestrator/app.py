@@ -103,11 +103,16 @@ def predict_light():
     # 2. Call similarity matcher
     similarity_result = None
     try:
-        print(f"DEBUG: Calling Similarity Matcher for LIGHT (60s timeout)", flush=True)
+        print(f"DEBUG: Calling Similarity Matcher for LIGHT (Port 3000)", flush=True)
         resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json={"claim": text}, timeout=60)
+        print(f"DEBUG: Similarity response status for LIGHT: {resp.status_code}", flush=True)
         if resp.status_code == 200:
             similarity_result = resp.json()
-            print(f"DEBUG: Similarity raw for LIGHT: {similarity_result}", flush=True)
+            print(f"DEBUG: Similarity API Response for LIGHT: {similarity_result}", flush=True)
+            if similarity_result.get("used_online_search"):
+                print(f"DEBUG: [ORC-LIGHT] Live News API was used! Found {len(similarity_result.get('neighbors', []))} results.", flush=True)
+        else:
+            print(f"DEBUG: Similarity Matcher returned error {resp.status_code}: {resp.text}", flush=True)
     except Exception as e:
         print(f"DEBUG: Exception in LIGHT similarity call: {e}", flush=True)
         similarity_result = None

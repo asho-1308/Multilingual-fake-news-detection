@@ -224,26 +224,29 @@ class SemanticVerifierService:
         neighbors = self._semantic_search_unique(claim, top_k=top_k, max_candidates=max_candidates)
         
         # Trigger online scraping if no strong match in CSV
-        # Threshold: if the best single match is < 0.7, try online
+        # Threshold: if the best single match is < 0.7 (70%), try online
         best_sim_csv = neighbors[0]['similarity'] if neighbors else 0
         is_fallback = False
         
+        print(f"DEBUG: [SM] Best CSV match similarity: {best_sim_csv:.4f}")
+
         if best_sim_csv < 0.7:
-            print(f"DEBUG: [SM] Best CSV match ({best_sim_csv:.4f}) below threshold 0.7. Triggering Online Search...")
+            print(f"DEBUG: [SM] Similarity {best_sim_csv:.4f} < 0.7. Triggering LIVE API search...")
             online_neighbors = self._scrape_online_news(claim)
             if online_neighbors:
+                print(f"DEBUG: [SM] Found {len(online_neighbors)} live results. Merging with local results.")
                 # Merge and keep top_k best results overall
                 neighbors = sorted(online_neighbors + neighbors, key=lambda x: x['similarity'], reverse=True)[:top_k]
                 is_fallback = True
             else:
-                print("DEBUG: [SM] No online news results found/matched.")
+                print("DEBUG: [SM] No live news results found or matched.")
 
         final_verdict, confidence = self._aggregate_verdict(neighbors)
 
         # If Online Scraper found a match and aggregate didn't catch it
         if is_fallback and neighbors and neighbors[0].get('is_online'):
             best_sim = neighbors[0]['similarity']
-            if best_sim > 0.5: # Lower threshold to favor online news over "Uncertain"
+            if best_sim > 0.5:
                 final_verdict = "VERIFIED REAL (ONLINE)"
                 confidence = best_sim
 

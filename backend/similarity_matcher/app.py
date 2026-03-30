@@ -45,4 +45,5 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "3000"))
     print(f"🚀 Starting Semantic Verifier API on http://{host}:{port}")
-    app.run(host=host, port=port, debug=True)
+    # Disable reloader on Windows to prevent WinError 10038 and unnecessary reloading
+    app.run(host=host, port=port, debug=True, use_reloader=False)
