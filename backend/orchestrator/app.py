@@ -70,6 +70,14 @@ def predict_light():
     print(f"DEBUG: LIGHT detected language: {language}", flush=True)
     sys.stdout.flush()
 
+    if language not in ["tamil", "sinhala"]:
+        return jsonify({
+            "language": language,
+            "final_prediction": "Ignored",
+            "final_confidence": 0.0,
+            "message": "Chrome extension only supports Tamil and Sinhala."
+        }), 200
+
     # 1. Forward to language-specific classifier
     classifier_result = None
     try:
@@ -95,8 +103,8 @@ def predict_light():
     # 2. Call similarity matcher
     similarity_result = None
     try:
-        print(f"DEBUG: Calling Similarity Matcher for LIGHT", flush=True)
-        resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json={"claim": text}, timeout=15)
+        print(f"DEBUG: Calling Similarity Matcher for LIGHT (60s timeout)", flush=True)
+        resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json={"claim": text}, timeout=60)
         if resp.status_code == 200:
             similarity_result = resp.json()
             print(f"DEBUG: Similarity raw for LIGHT: {similarity_result}", flush=True)
@@ -119,13 +127,23 @@ def predict_light():
         if is_p_fake or is_p_real:
             signals.append({'is_fake': is_p_fake, 'conf': conf, 'weight': 1.0})
 
-    if similarity_result and similarity_result.get('final_verdict'):
-        fv = similarity_result.get('final_verdict', '').lower()
-        conf = float(similarity_result.get('confidence', 0.0))
-        # Check neighbors as well if ensemble needs more detail
-        if conf > 0.1 and "no match" not in fv:
-            is_s_fake = any(x in fv for x in ['fake', 'false', 'අසත්‍ය'])
-            signals.append({'is_fake': is_s_fake, 'conf': conf, 'weight': 1.5}) # High weight for similarity
+    if similarity_result and similarity_result.get('neighbors'):
+        neighbors = similarity_result['neighbors']
+        best_match = max(neighbors, key=lambda x: x['similarity']) if neighbors else None
+        
+        if best_match and best_match['similarity'] > 0.1:
+            s_conf = float(best_match['similarity'])
+            s_verdict = str(best_match.get('verdict', '')).lower()
+            
+            # Treat "News Article" (from Online Search) as REAL
+            is_s_fake = any(x in s_verdict for x in ['fake', 'false', 'අසත්‍ය'])
+            # If it's from the online scraper ("News Article"), it's definitely REAL for our signal
+            if "news article" in s_verdict or "verified real" in s_verdict:
+                is_s_fake = False
+
+            # High weight because exact matches are very reliable for the extension
+            s_weight = 2.0 if s_conf > 0.9 else 1.5
+            signals.append({'is_fake': is_s_fake, 'conf': s_conf, 'weight': s_weight})
 
     if signals:
         total_weight = sum(s['weight'] for s in signals)
