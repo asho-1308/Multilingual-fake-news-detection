@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir --timeout=600 \
     torch==2.1.0 \
     transformers==4.36.0 \
     numpy==1.26.4 \
-    scikit-learn==1.3.0 \
+    scikit-learn==1.6.1 \
     pandas==2.0.3 \
     sentence-transformers==2.2.2 \
     huggingface-hub==0.19.4 \

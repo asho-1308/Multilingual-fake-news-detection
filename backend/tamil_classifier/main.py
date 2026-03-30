@@ -105,6 +105,10 @@ async def lifespan(app: FastAPI):
 # --- APP SETUP ---
 app = FastAPI(title="Tamil Fake News Detector", lifespan=lifespan)
 
+@app.get("/health")
+def health():
+    return {"status": "ok", "message": "Tamil classifier service is running"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

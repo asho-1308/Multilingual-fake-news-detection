@@ -6,6 +6,14 @@ from flask_cors import CORS
 # --- 1. Setup Flask App ---
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+@app.get("/health")
+def health():
+    return jsonify({
+        "status": "ok",
+        "message": "Credibility predictor service is running"
+    })
+
 PORT = 4000
 
 # --- 2. Load Model & Encoder ---
