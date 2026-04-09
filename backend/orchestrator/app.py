@@ -13,10 +13,10 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Service URLs - Using loopback ip for Windows stability
-TAMIL_CLASSIFIER_URL = "http://127.0.0.1:1000"
-SINHALA_CLASSIFIER_URL = "http://127.0.0.1:2000"
-SIMILARITY_MATCHER_URL = "http://127.0.0.1:3000"
-CREDIBILITY_PREDICTOR_URL = "http://127.0.0.1:4000"
+TAMIL_CLASSIFIER_URL = os.getenv("TAMIL_CLASSIFIER_URL", "http://127.0.0.1:1000")
+SINHALA_CLASSIFIER_URL = os.getenv("SINHALA_CLASSIFIER_URL", "http://127.0.0.1:2000")
+SIMILARITY_MATCHER_URL = os.getenv("SIMILARITY_MATCHER_URL", "http://127.0.0.1:3000")
+CREDIBILITY_PREDICTOR_URL = os.getenv("CREDIBILITY_PREDICTOR_URL", "http://127.0.0.1:4000")
 
 
 def detect_language(text: str) -> str:
@@ -186,6 +186,8 @@ def predict_light():
 def predict():
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
+    debug_mode = bool(data.get("debug", False))
+    debug_info = {}
     print(f"DEBUG: Processing request for text: '{text[:50]}...'", flush=True)
     sys.stdout.flush()
     
@@ -212,11 +214,17 @@ def predict():
             print(f"DEBUG: Calling Tamil Classifier at {TAMIL_CLASSIFIER_URL}", flush=True)
             sys.stdout.flush()
             resp = requests.post(f"{TAMIL_CLASSIFIER_URL}/predict", json={"text": text}, timeout=30)
+            debug_info['tamil_status'] = resp.status_code
+            try:
+                debug_info['tamil_text'] = resp.text
+            except Exception:
+                debug_info['tamil_text'] = '<unreadable body>'
             print(f"DEBUG: Tamil response status: {resp.status_code}", flush=True)
             sys.stdout.flush()
             if resp.status_code == 200:
                 raw_classifier = resp.json()
                 print(f"DEBUG: Tamil raw response: {raw_classifier}", flush=True)
+                debug_info['tamil_json'] = raw_classifier
                 sys.stdout.flush()
                 # Tamil returns 'prediction' (Fake/Real) and 'confidence' (float) inside a 'success' status
                 if raw_classifier.get('status') == 'success':
@@ -233,6 +241,11 @@ def predict():
             print(f"DEBUG: Calling Sinhala Classifier at {SINHALA_CLASSIFIER_URL}", flush=True)
             sys.stdout.flush()
             resp = requests.post(f"{SINHALA_CLASSIFIER_URL}/predict", json={"text": text}, timeout=30)
+            debug_info['sinhala_status'] = resp.status_code
+            try:
+                debug_info['sinhala_text'] = resp.text
+            except Exception:
+                debug_info['sinhala_text'] = '<unreadable body>'
             print(f"DEBUG: Sinhala response status: {resp.status_code}", flush=True)
             sys.stdout.flush()
             if resp.status_code == 200:
@@ -259,6 +272,11 @@ def predict():
         print(f"DEBUG: Calling Similarity Matcher at {SIMILARITY_MATCHER_URL}", flush=True)
         sys.stdout.flush()
         resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json={"claim": text}, timeout=30)
+        debug_info['similarity_status'] = resp.status_code
+        try:
+            debug_info['similarity_text'] = resp.text
+        except Exception:
+            debug_info['similarity_text'] = '<unreadable body>'
         print(f"DEBUG: Similarity response status: {resp.status_code}", flush=True)
         sys.stdout.flush()
         if resp.status_code == 200:
@@ -285,6 +303,11 @@ def predict():
         print(f"DEBUG: Calling Credibility Predictor at {CREDIBILITY_PREDICTOR_URL} with lang: {cred_lang}", flush=True)
         sys.stdout.flush()
         resp = requests.post(f"{CREDIBILITY_PREDICTOR_URL}/predict", json=cred_payload, timeout=30)
+        debug_info['credibility_status'] = resp.status_code
+        try:
+            debug_info['credibility_text'] = resp.text
+        except Exception:
+            debug_info['credibility_text'] = '<unreadable body>'
         print(f"DEBUG: Credibility response status: {resp.status_code}", flush=True)
         sys.stdout.flush()
         if resp.status_code == 200:
@@ -380,16 +403,18 @@ def predict():
         "final_prediction": final_prediction,
         "final_confidence": round(final_confidence, 4)
     }
+    if debug_mode:
+        result['_debug'] = debug_info
 
     return jsonify(result), 200
 
 
 if __name__ == "__main__":
-    # Define services using loopback address for consistency
-    TAMIL_CLASSIFIER_URL = "http://127.0.0.1:1000"
-    SINHALA_CLASSIFIER_URL = "http://127.0.0.1:2000"
-    SIMILARITY_MATCHER_URL = "http://127.0.0.1:3000"
-    CREDIBILITY_PREDICTOR_URL = "http://127.0.0.1:4000"
+    # Allow overriding service URLs via environment (use container hostnames in compose)
+    TAMIL_CLASSIFIER_URL = os.getenv("TAMIL_CLASSIFIER_URL", "http://127.0.0.1:1000")
+    SINHALA_CLASSIFIER_URL = os.getenv("SINHALA_CLASSIFIER_URL", "http://127.0.0.1:2000")
+    SIMILARITY_MATCHER_URL = os.getenv("SIMILARITY_MATCHER_URL", "http://127.0.0.1:3000")
+    CREDIBILITY_PREDICTOR_URL = os.getenv("CREDIBILITY_PREDICTOR_URL", "http://127.0.0.1:4000")
 
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     services = [

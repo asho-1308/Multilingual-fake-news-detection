@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir --timeout=600 \
     numpy==1.26.4 \
     scikit-learn==1.6.1 \
     pandas==2.0.3 \
-    sentence-transformers==2.2.2 \
+    sentence-transformers==5.1.0 \
     huggingface-hub==0.19.4 \
     faiss-cpu==1.7.4 \
     fastapi==0.104.1 \
