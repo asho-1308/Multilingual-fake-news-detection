@@ -35,8 +35,13 @@ const SemanticSimilarityMatcher = () => {
     setError("");
 
     try {
-      // The Similarity Matcher service runs on port 3000
-      const response = await fetch("http://127.0.0.1:3000/api/verify", {
+      // Debug: log outgoing payload
+      console.log("[SM] Sending similarity request", { claim, top_k: topK });
+      // The Similarity Matcher service runs on port 3000 by default,
+      // allow overriding via Vite env var `VITE_SIMILARITY_URL`.
+      const similarityUrl = import.meta.env.VITE_SIMILARITY_URL ?? "http://127.0.0.1:3000/api/verify";
+      console.log("[SM] Using similarity endpoint:", similarityUrl);
+      const response = await fetch(similarityUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -47,15 +52,28 @@ const SemanticSimilarityMatcher = () => {
         }),
       });
 
+      // Debug: capture raw response text for better diagnostics
+      const rawText = await response.text();
+      console.log("[SM] Similarity response status", response.status, "body:", rawText);
+
       if (!response.ok) {
-        throw new Error("Failed to check similarity");
+        // try to parse json if possible, otherwise include raw text
+        let details = rawText;
+        try {
+          details = JSON.parse(rawText);
+        } catch (e) {
+          // keep raw
+        }
+        throw new Error(`Failed to check similarity: ${response.status} ${JSON.stringify(details)}`);
       }
 
-      const data = await response.json();
+      const data = JSON.parse(rawText || '{}');
+      console.log("[SM] Similarity parsed response", data);
       setResult(data);
     } catch (err) {
-      setError("Failed to check similarity. Please ensure the similarity matcher service is running.");
-      console.error(err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setError("Failed to check similarity. See console for details.");
+      console.error("[SM] Similarity request failed:", msg, err);
     } finally {
       setIsAnalyzing(false);
     }
