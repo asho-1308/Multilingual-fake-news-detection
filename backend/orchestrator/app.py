@@ -13,10 +13,10 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Service URLs - Using loopback ip for Windows stability
-TAMIL_CLASSIFIER_URL = "http://127.0.0.1:1000"
-SINHALA_CLASSIFIER_URL = "http://127.0.0.1:2000"
-SIMILARITY_MATCHER_URL = "http://127.0.0.1:3000"
-CREDIBILITY_PREDICTOR_URL = "http://127.0.0.1:4000"
+TAMIL_CLASSIFIER_URL = os.getenv("TAMIL_CLASSIFIER_URL", "http://127.0.0.1:1000")
+SINHALA_CLASSIFIER_URL = os.getenv("SINHALA_CLASSIFIER_URL", "http://127.0.0.1:2000")
+SIMILARITY_MATCHER_URL = os.getenv("SIMILARITY_MATCHER_URL", "http://127.0.0.1:3000")
+CREDIBILITY_PREDICTOR_URL = os.getenv("CREDIBILITY_PREDICTOR_URL", "http://127.0.0.1:4000")
 
 
 def detect_language(text: str) -> str:
@@ -385,11 +385,11 @@ def predict():
 
 
 if __name__ == "__main__":
-    # Define services using loopback address for consistency
-    TAMIL_CLASSIFIER_URL = "http://127.0.0.1:1000"
-    SINHALA_CLASSIFIER_URL = "http://127.0.0.1:2000"
-    SIMILARITY_MATCHER_URL = "http://127.0.0.1:3000"
-    CREDIBILITY_PREDICTOR_URL = "http://127.0.0.1:4000"
+    # Allow overriding service URLs via environment (use container hostnames in compose)
+    TAMIL_CLASSIFIER_URL = os.getenv("TAMIL_CLASSIFIER_URL", "http://127.0.0.1:1000")
+    SINHALA_CLASSIFIER_URL = os.getenv("SINHALA_CLASSIFIER_URL", "http://127.0.0.1:2000")
+    SIMILARITY_MATCHER_URL = os.getenv("SIMILARITY_MATCHER_URL", "http://127.0.0.1:3000")
+    CREDIBILITY_PREDICTOR_URL = os.getenv("CREDIBILITY_PREDICTOR_URL", "http://127.0.0.1:4000")
 
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     services = [
