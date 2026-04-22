@@ -233,7 +233,7 @@ Once running, you can access the services at:
   },
   "credibility": {
     "credibility": "High",
-    "confidence": 0.85
+    "confidence": 0.85000
   }
 }
 ```
