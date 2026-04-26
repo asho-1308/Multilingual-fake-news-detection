@@ -1,0 +1,125 @@
+% Tamil Fake News Classification Thesis Draft
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\geometry{margin=1in}
+\title{Automatic Detection of Fake News in Tamil News Headlines: Model, Deployment, and Evaluation}
+\author{Prepared from repository artifacts}
+\date{April 2026}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+This thesis presents the design, implementation, and evaluation of an automatic fake-news detection system for Tamil news headlines. We document dataset preparation, model architecture, preprocessing, deployment as a FastAPI inference service, and recommendations for reproducible training and evaluation. The reported work uses a fine-tuned BERT-based sequence classification model (12 layers, 768 hidden size) stored in the repository under \texttt{backend/tamil_classifier/my_tamil_fake_news_model}.
+\end{abstract}
+
+\section{Introduction}
+Fake news and misinformation pose significant challenges to information ecosystems. Automatic classification systems can assist fact-checkers and platforms by filtering likely false content. This work focuses on Tamil news headlines, presenting an end-to-end system: dataset, model, inference API with OCR support, and deployment artifacts.
+
+\section{Related Work}
+Prior research on fake news detection uses linguistic features, network signals, and transformer-based classifiers. Multilingual and low-resource settings frequently leverage transfer learning from multilingual BERT or language-specific BERT variants. This project follows fine-tuning of a BERT-style model for Tamil headline classification.
+
+\section{Dataset}
+The repository contains a candidate dataset: \texttt{data/Tamil-News-Headlines.csv}. The dataset should be documented for provenance, annotation methodology, and licensing. For reproducibility we recommend recording exact train/validation/test splits and random seeds. Typical dataset statistics to report include number of instances per class, average length, and class balance; placeholders are included here and should be replaced with measured values after dataset analysis.
+
+\section{Preprocessing}
+Text cleaning for inference keeps Tamil Unicode ranges and applies Indic-normalization when available (the inference service uses \texttt{indic-nlp-library}). OCR integration is provided via EasyOCR models found in \texttt{backend/tamil_classifier/ocr_models} for image-to-text extraction. For training, recommended preprocessing steps:
+\begin{itemize}
+  \item Normalization: Unicode normalization and Indic normalization.
+  \item Tokenization: Use the provided tokenizer files in \texttt{my_tamil_fake_news_model} to match training tokenization.
+  \item Truncation: Use maximum sequence length of 512 tokens, as indicated by \texttt{max_position_embeddings} in model config.
+  \item Lowercasing: Follow tokenizer configuration (vocab and tokenizer files provided).
+\end{itemize}
+
+\section{Model Architecture}
+The saved model follows a BERT sequence classification architecture. Extracted metadata (from \texttt{config.json}):
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Property & Value \\
+\midrule
+Model type & BERT (BertForSequenceClassification) \\
+Hidden size & 768 \\
+Number of layers & 12 \\
+Attention heads & 12 \\
+Vocab size & 197,285 \\
+Max position embeddings & 512 \\
+Weights file & model.safetensors \\
+Tokenizer files & tokenizer.json, vocab.txt \\
+\bottomrule
+\end{tabular}
+\caption{Model configuration extracted from model artifact}
+\end{table}
+
+The classifier head is a standard linear layer on top of pooled BERT outputs. The repository does not include explicit training hyperparameters; see the Training section for a proposed reproducible setup.
+
+\section{Training (Reproducible Setup)}
+Training scripts are not present in the \texttt{tamil_classifier} folder. To reproduce training, use the following recommended settings as a baseline:
+\begin{itemize}
+  \item Optimizer: AdamW
+  \item Learning rate: 2e-5 (with linear warmup and decay)
+  \item Batch size: 16--32 (depending on GPU memory)
+  \item Epochs: 3--5
+  \item Max sequence length: 256--512
+  \item Loss: CrossEntropyLoss
+  \item Metrics: Accuracy, Precision, Recall, F1-score (macro and per-class)
+\end{itemize}
+
+Include logging of training and validation loss, and save checkpoints per epoch. Maintain a seed for reproducibility.
+
+\section{Evaluation and Results}
+The repository currently lacks saved evaluation metrics and confusion matrices. After reproducing training or obtaining a held-out test set, report the following:
+\begin{itemize}
+  \item Confusion matrix with counts and normalized rates.
+  \item Precision, recall, F1 for each class (Fake/Real) and macro averages.
+  \item ROC-AUC if a probability-based ranking is relevant.
+  \item Error analysis: common failure modes, adversarial examples, and misclassified samples.
+\end{itemize}
+
+\section{Deployment and Inference}
+The project provides a FastAPI inference service in \texttt{backend/tamil_classifier/main.py}. Key endpoints:
+\begin{itemize}
+  \item \texttt{/health}: health check
+  \item \texttt{/predict}: JSON POST with field \texttt{text}
+  \item \texttt{/predict_image_upload} and \texttt{/predict_image_url}: OCR + predict pipeline
+\end{itemize}
+
+The service loads the model via Hugging Face pipelines using the local model directory, and integrates EasyOCR for image inputs. Dockerfile and \texttt{requirements.txt} are provided for containerized deployment.
+
+\section{Ethics and Limitations}
+Discuss dataset biases, potential harms from misclassification, the need for human-in-the-loop verification for high-risk decisions, and data license/consent issues. Include statements about limitations arising from dataset provenance and the lack of documented annotation procedures.
+
+\section{Conclusion and Future Work}
+Summarize contributions: artifact-based documentation of a deployed Tamil fake-news classifier, integration of OCR and Indic normalization, and a reproducible training checklist. Future work: expand dataset size and diversity, multilingual transfer learning, model compression for mobile deployment, and improved explainability (e.g., attention-based rationales).
+
+\section*{Appendix: Model config excerpt}
+\begin{verbatim}
+Model: BertForSequenceClassification
+hidden_size: 768
+num_hidden_layers: 12
+num_attention_heads: 12
+vocab_size: 197285
+transformers_version: 4.57.3
+\end{verbatim}
+
+\section*{Appendix: Reproducible training command (example)}
+\begin{verbatim}
+python train.py \
+  --model_name_or_path bert-base-uncased \
+  --train_file data/Tamil-News-Headlines.csv \
+  --per_device_train_batch_size 16 \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3 \
+  --max_seq_length 256 \
+  --output_dir output/tamil_model
+\end{verbatim}
+
+\vspace{1cm}
+\noindent Prepared from repository artifacts in April 2026.
+\end{document}
