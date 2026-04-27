@@ -6,3 +6,7 @@ torch
 faiss-cpu
 pandas
 numpy
+requests
+beautifulsoup4
+readability-lxml
+newspaper3k

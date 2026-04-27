@@ -21,6 +21,9 @@ def api_verify():
     data = request.get_json(silent=True) or {}
     claim = str(data.get("claim", "")).strip()
     top_k = data.get("top_k", None)
+    # Mode controls where to search: 'auto' (default), 'local', 'online', or 'both'
+    mode = str(data.get("mode", "auto")).strip().lower()
+    debug = bool(data.get("debug", False))
 
     if not claim:
         return jsonify({"error": "Missing 'claim' in request body"}), 400
@@ -35,7 +38,11 @@ def api_verify():
         return jsonify({"error": "top_k must be an integer"}), 400
 
     try:
-        result = service.verify(claim, top_k=top_k)
+        # validate mode
+        if mode not in ("auto", "local", "online", "both"):
+            return jsonify({"error": "mode must be one of: auto, local, online, both"}), 400
+
+        result = service.verify(claim, top_k=top_k, mode=mode, debug=debug)
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": "Verification failed", "details": str(e)}), 500
