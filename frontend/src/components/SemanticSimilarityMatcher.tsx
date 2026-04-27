@@ -20,10 +20,12 @@ interface SimilarityResult {
 
 const SemanticSimilarityMatcher = () => {
   const [claim, setClaim] = useState("");
-  const [topK, setTopK] = useState(3);
+  const [mode, setMode] = useState("auto");
+  const [topK, setTopK] = useState(1);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<SimilarityResult | null>(null);
   const [error, setError] = useState("");
+  const [expandedSamples, setExpandedSamples] = useState<Record<number, boolean>>({});
 
   // Support both backend response shapes: `neighbors` (new) and `similar_sources` (legacy)
   const matches = result ? ((result as any).neighbors ?? (result as any).similar_sources ?? []) : [];
@@ -36,7 +38,7 @@ const SemanticSimilarityMatcher = () => {
 
     try {
       // Debug: log outgoing payload
-      console.log("[SM] Sending similarity request", { claim, top_k: topK });
+      console.log("[SM] Sending similarity request", { claim, top_k: topK, mode });
       // The Similarity Matcher service runs on port 3000 by default,
       // allow overriding via Vite env var `VITE_SIMILARITY_URL`.
       const similarityUrl = import.meta.env.VITE_SIMILARITY_URL ?? "http://127.0.0.1:3000/api/verify";
@@ -48,7 +50,8 @@ const SemanticSimilarityMatcher = () => {
         },
         body: JSON.stringify({
           claim: claim,
-          top_k: topK
+          top_k: topK,
+          mode: mode
         }),
       });
 
@@ -111,9 +114,23 @@ const SemanticSimilarityMatcher = () => {
               min="1"
               max="10"
               value={topK}
-              onChange={(e) => setTopK(parseInt(e.target.value) || 3)}
+              onChange={(e) => setTopK(parseInt(e.target.value) || 1)}
               className="w-full mt-1"
             />
+          </div>
+          <div>
+            <Label htmlFor="mode">Search Mode</Label>
+            <select
+              id="mode"
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+              className="w-full mt-1 border rounded px-2 py-1"
+            >
+              <option value="auto">Auto</option>
+              <option value="local">Local (FAISS)</option>
+              <option value="online">Online (live)</option>
+              <option value="both">Both</option>
+            </select>
           </div>
         </CardContent>
         <CardFooter>
@@ -152,19 +169,63 @@ const SemanticSimilarityMatcher = () => {
             {matches && matches.length > 0 ? (
               <div className="space-y-4">
                 {matches.map((source: any, index: number) => {
-                  const similarity = source.similarity ?? source.similarity_score ?? 0;
-                  const title = source.title ?? source.claim;
+                  const rawSim = Number(source.similarity ?? source.similarity_score ?? 0);
+                  // Handle backend returning fraction (0..1) or percentage (0..100).
+                  // Tolerate tiny floating-point >1 values (e.g. 1.000000119) as full 100%.
+                  let similarity = 0;
+                  if (!Number.isFinite(rawSim)) {
+                    similarity = 0;
+                  } else if (rawSim >= 0 && rawSim <= 1.001) {
+                    // Treat values in [0,1.001] as fractions (handles tiny FP noise like 1.0000001)
+                    similarity = rawSim * 100;
+                  } else {
+                    similarity = rawSim;
+                  }
+                  const title = source.title ?? source.headline ?? source.claim;
+                  const isExpanded = !!expandedSamples[index];
+                  const highlightClass = similarity >= 90 ? 'border-green-500 bg-green-50' : '';
                   return (
-                    <div key={index} className="border rounded-lg p-4">
+                    <div key={index} className={`border rounded-lg p-4 ${highlightClass}`}>
                       <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-semibold text-sm">{source.source}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-sm">{source.source}</h4>
+                          {similarity >= 90 && (
+                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Exact match</span>
+                          )}
+                        </div>
                         <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-                          {(similarity * 100).toFixed(2)}% similar
+                          {similarity.toFixed(2)}% similar
                         </span>
                       </div>
 
                       {source.verdict && <p className="text-sm mb-1"><strong>Verdict:</strong> {source.verdict}</p>}
                       {title && <p className="text-sm text-gray-600 mb-2">{title}</p>}
+
+                      <div className="flex items-center gap-2 mb-2">
+                        {source.full_text_used && (
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Full text used</span>
+                        )}
+                        {source.is_online && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Online</span>
+                        )}
+                        {source.source && (
+                          <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">{source.source}</span>
+                        )}
+                      </div>
+
+                      {source.text_sample && (
+                        <div className="mb-2">
+                          <button
+                            className="text-sm text-blue-600 hover:underline"
+                            onClick={() => setExpandedSamples(prev => ({ ...prev, [index]: !prev[index] }))}
+                          >
+                            {isExpanded ? 'Hide text sample' : 'Show text sample'}
+                          </button>
+                          {isExpanded && (
+                            <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-3 rounded text-sm">{source.text_sample}</pre>
+                          )}
+                        </div>
+                      )}
 
                       {source.url && (
                         <a
