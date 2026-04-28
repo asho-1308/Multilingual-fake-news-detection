@@ -2,7 +2,6 @@ import uvicorn
 import re
 import io
 import os
-import shutil
 import requests
 import torch
 import numpy as np
@@ -14,21 +13,23 @@ from indicnlp.normalize.indic_normalize import IndicNormalizerFactory
 from contextlib import asynccontextmanager
 from PIL import Image
 import cv2
+import pytesseract
+
+# If you are on WINDOWS, you must set this line to your installation path:
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # --- CONFIGURATION ---
 PORT = 1000
 MODEL_PATH = "./my_tamil_fake_news_model"
 INDIC_RESOURCES_PATH = "./indic_nlp_resources"
-OCR_MODEL_DIR = "./ocr_models"
 
 # --- GLOBAL VARIABLES ---
 classifier = None
 normalizer = None
-ocr_reader = None
 
 # --- LOAD RESOURCES ---
 def load_model_and_resources():
-    global classifier, normalizer, ocr_reader
+    global classifier, normalizer
     
     print("--- SYSTEM STARTUP ---")
 
@@ -55,52 +56,14 @@ def load_model_and_resources():
     except Exception as e:
         print(f"   CRITICAL ERROR: Could not load model. {e}")
 
-    # 3. Initialize EasyOCR (PRIMARY METHOD)
-    print("3. Initializing EasyOCR...")
-    try:
-        import easyocr
-        if not os.path.exists(OCR_MODEL_DIR):
-            os.makedirs(OCR_MODEL_DIR)
-        
-        # Try with existing models first
-        try:
-            print("   Trying with existing models (download_enabled=False)...")
-            ocr_reader = easyocr.Reader(
-                ['ta', 'en'], 
-                gpu=False,  # Force CPU to avoid GPU issues
-                model_storage_directory=OCR_MODEL_DIR,
-                download_enabled=False  # Don't download, use existing
-            )
-            print("   EasyOCR Initialized Successfully with existing models.")
-        except Exception as e1:
-            print(f"   Failed with existing models ({e1}), trying with download...")
-            # If existing models don't work, try downloading
-            try:
-                ocr_reader = easyocr.Reader(
-                    ['ta', 'en'], 
-                    gpu=False,
-                    model_storage_directory=OCR_MODEL_DIR,
-                    download_enabled=True
-                )
-                print("   EasyOCR Initialized Successfully with downloaded models.")
-            except Exception as e2:
-                print(f"   Failed with download too ({e2})")
-                ocr_reader = None
-    except ImportError as ie:
-        print(f"   CRITICAL: 'easyocr' library not found. Please run: pip install easyocr ({ie})")
-        ocr_reader = None
-    except Exception as e:
-        print(f"   EasyOCR Init Failed: {e}")
-        import traceback
-        traceback.print_exc()
-        ocr_reader = None
-
-    print("--- STARTUP COMPLETE ---")
-
+    # 3. Tesseract OCR
+    print("3. Tesseract OCR is ready (no pre-loading needed).")
+    
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_model_and_resources()
     yield
+    print("--- SYSTEM SHUTDOWN ---")
 
 # --- APP SETUP ---
 app = FastAPI(title="Tamil Fake News Detector", lifespan=lifespan)
@@ -132,73 +95,63 @@ def clean_text(text: str):
         return normalizer.normalize(text.strip()) if text.strip() else ""
     return text.strip()
 
-def preprocess_image(image):
+def preprocess_for_tesseract(image: Image.Image):
     """
-    Preprocess image for better OCR results.
+    Cleans the image for better Tesseract OCR results.
     """
-    import cv2
-    import numpy as np
-    
-    # Convert PIL to OpenCV format
-    image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-    
-    # Convert to grayscale
-    gray = cv2.cvtColor(image_cv, cv2.COLOR_BGR2GRAY)
-    
-    # Apply thresholding to get better contrast
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    # Convert back to PIL Image
-    from PIL import Image
-    processed_image = Image.fromarray(thresh)
-    
-    return processed_image
+    print("--- OCR: Preprocessing for Tesseract ---")
+    # Convert PIL image to OpenCV format
+    img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-def perform_ocr(image):
-    """
-    Extracts text using EasyOCR with fallback options.
-    """
-    if not ocr_reader:
-        print("Error: OCR Reader is not initialized.")
-        return ""
+    # 1. Grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+    # 2. Resizing (Tesseract often works well with images around 300 DPI)
+    gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+
+    # 3. Denoising
+    denoised = cv2.fastNlMeansDenoising(gray, h=10)
+
+    # 4. Thresholding
+    thresh = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+
+    return thresh
+
+def perform_ocr(image: Image.Image):
+    """
+    Extracts text using Tesseract OCR.
+    """
     try:
-        # Try original image first
-        image_np = np.array(image)
-        print(f"Original image shape: {image_np.shape}, dtype: {image_np.dtype}")
-
-        results = ocr_reader.readtext(image_np, detail=0, paragraph=True)
-        text = " ".join(results)
+        processed_img = preprocess_for_tesseract(image)
         
-        print(f"OCR on original image extracted: '{text[:100]}...' (length: {len(text)})")
+        print("--- OCR: Extracting Text with Tesseract ---")
+        # lang='tam+eng' tells it to look for both Tamil and English
+        custom_config = r'-l tam+eng --psm 3'
         
-        # If no text found, try preprocessed image
-        if not text.strip():
-            print("No text found on original, trying preprocessed image...")
-            processed_image = preprocess_image(image)
-            image_np = np.array(processed_image)
-            
-            results = ocr_reader.readtext(image_np, detail=0, paragraph=True)
-            text = " ".join(results)
-            print(f"OCR on processed image extracted: '{text[:100]}...' (length: {len(text)})")
+        text = pytesseract.image_to_string(processed_img, config=custom_config)
         
-        # If still no text, try without paragraph mode
-        if not text.strip():
-            print("No text found with paragraph=True, trying without paragraph mode...")
-            results = ocr_reader.readtext(image_np, detail=0, paragraph=False)
-            text = " ".join(results)
-            print(f"OCR without paragraph extracted: '{text[:100]}...' (length: {len(text)})")
+        # Post-processing: Basic cleanup
+        clean_text = "\n".join([line.strip() for line in text.splitlines() if line.strip()])
         
-        return text
-
+        print(f"--- OCR: Extracted Text ---\n{clean_text[:150]}...")
+        return clean_text
+    except pytesseract.TesseractNotFoundError:
+        error_msg = "Tesseract is not installed or not in your PATH. Please install it."
+        print(f"CRITICAL: {error_msg}")
+        # Return a specific error message that the frontend can display
+        return f"OCR_ERROR: {error_msg}"
     except Exception as e:
-        print(f"EasyOCR Error: {e}")
+        print(f"An error occurred during Tesseract OCR: {e}")
         return ""
 
 def predict_from_text(text: str):
     """
     Common logic for both text input and OCR input.
     """
+    # Handle OCR-specific errors first
+    if text.startswith("OCR_ERROR:"):
+        return {"status": "error", "message": text.replace("OCR_ERROR: ", "")}
+
     # 1. Clean the text
     cleaned = clean_text(text)
     
