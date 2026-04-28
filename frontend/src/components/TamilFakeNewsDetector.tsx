@@ -166,10 +166,10 @@ const TamilFakeNewsDetector = () => {
             <Upload className="h-4 w-4" />
             Image Upload
           </TabsTrigger>
-          <TabsTrigger value="url" className="flex items-center gap-2">
+          {/* <TabsTrigger value="url" className="flex items-center gap-2">
             <ImageIcon className="h-4 w-4" />
             Image URL
-          </TabsTrigger>
+          </TabsTrigger> */}
         </TabsList>
 
         <TabsContent value="text" className="space-y-4">
