@@ -314,8 +314,6 @@ def predict():
             credibility_result = resp.json()
             print(f"DEBUG: Credibility raw response: {credibility_result}", flush=True)
             sys.stdout.flush()
-            # Pass through the full high-precision result for the frontend
-            # The ensemble still gets its normalized values below
     except Exception as e:
         print(f"DEBUG: Exception calling credibility predictor: {e}", flush=True)
         sys.stdout.flush()
