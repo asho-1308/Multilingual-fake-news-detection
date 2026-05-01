@@ -6,6 +6,9 @@ FROM multilingual-fake-news-detection-base:latest
 # Copy application code
 COPY . .
 
+# Copy the Tesseract language data file
+COPY tessdata/tam.traineddata /usr/share/tesseract-ocr/4.00/tessdata/tam.traineddata
+
 # Expose port 1000
 EXPOSE 1000
 

@@ -15,13 +15,20 @@ from PIL import Image
 import cv2
 import pytesseract
 
-# If you are on WINDOWS, you must set this line to your installation path:
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+import platform
 
 # --- CONFIGURATION ---
 PORT = 1000
 MODEL_PATH = "./my_tamil_fake_news_model"
 INDIC_RESOURCES_PATH = "./indic_nlp_resources"
+
+# Set Tesseract path based on OS
+if platform.system() == "Windows":
+    # If you are on WINDOWS, you must set this line to your installation path:
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+else:
+    # For Linux/Docker, Tesseract is usually in the PATH or at this location
+    pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 # --- GLOBAL VARIABLES ---
 classifier = None
