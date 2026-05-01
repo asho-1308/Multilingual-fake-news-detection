@@ -281,7 +281,7 @@ def predict():
         sys.stdout.flush()
         if resp.status_code == 200:
             similarity_result = resp.json()
-            # print(f"DEBUG: Similarity result: {similarity_result}")
+            print(f"DEBUG: Similarity result: {similarity_result}", flush=True)
     except Exception as e:
         print(f"DEBUG: Exception calling similarity matcher: {e}", flush=True)
         sys.stdout.flush()
