@@ -14,7 +14,24 @@ interface PredictionResult {
   original_text: string;
   prediction: string;
   confidence: number;
+  confidence_level?: string;
+  recommendation?: string;
+  linguistic_analysis?: {
+    intensity: string;
+    markers_found: string[];
+    sensationalism_score: number;
+  };
   cleaned_text?: string;
+  explanation?: {
+    summary: string;
+    trigger_words: Array<{ word: string; contribution: number }>;
+  };
+  metadata?: {
+    language_detected: string;
+    processing_time_ms: number;
+    model_version: string;
+    timestamp?: string;
+  };
 }
 
 const TamilFakeNewsDetector = () => {
@@ -152,6 +169,24 @@ const TamilFakeNewsDetector = () => {
 
   const getResultBg = (prediction: string) => {
     return prediction.toLowerCase() === "fake" ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200";
+  };
+
+  const getConfidenceColor = (level?: string) => {
+    switch (level?.toLowerCase()) {
+      case 'high': return 'text-green-600';
+      case 'medium': return 'text-yellow-600';
+      case 'low': return 'text-orange-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getLinguisticBadge = (intensity?: string) => {
+    switch (intensity?.toLowerCase()) {
+      case 'high': return 'bg-red-100 text-red-700 border-red-200';
+      case 'medium': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'low': return 'bg-blue-100 text-blue-700 border-blue-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
   };
 
   return (
@@ -296,41 +331,101 @@ const TamilFakeNewsDetector = () => {
       {result && (
         <Card className={getResultBg(result.prediction)}>
           <CardHeader>
-            <CardTitle className={`text-xl ${getResultColor(result.prediction)}`}>
-              Prediction: {result.prediction.toUpperCase()}
-            </CardTitle>
-            <CardDescription>
-              Confidence Score: {(result.confidence * 100).toFixed(2)}%
-            </CardDescription>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle className={`text-2xl font-bold ${getResultColor(result.prediction)}`}>
+                  {result.prediction.toUpperCase()}
+                </CardTitle>
+                <CardDescription>
+                  Confidence: <span className={`font-semibold ${getConfidenceColor(result.confidence_level)}`}>{result.confidence_level}</span> ({(result.confidence * 100).toFixed(2)}%)
+                </CardDescription>
+              </div>
+              <div className="text-right text-xs text-gray-400">
+                v{result.metadata?.model_version} | {result.metadata?.processing_time_ms}ms
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span>Result:</span>
-                <span className={`font-bold ${getResultColor(result.prediction)}`}>
-                  {result.prediction}
-                </span>
+          <CardContent className="space-y-6">
+            {/* Warning Message or Recommendation */}
+            <Alert className={`${result.prediction.toLowerCase() === "fake" ? "bg-red-100 border-red-300 text-red-800" : "bg-blue-50 border-blue-200 text-blue-800"}`}>
+              <AlertDescription className="font-medium">
+                {result.prediction.toLowerCase() === "fake" ? "⚠️ " : "ℹ️ "}
+                {result.recommendation || (result.prediction.toLowerCase() === "fake" 
+                  ? "This content has been flagged as potentially misleading. Please verify with trusted news sources."
+                  : "This content appears consistent with real news patterns.")}
+              </AlertDescription>
+            </Alert>
+
+            {/* Linguistic Tone & Sensationalism */}
+            {result.linguistic_analysis && (
+              <div className="space-y-3 p-4 bg-white/40 rounded-lg border shadow-sm">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-sm font-bold text-gray-700">Sensationalism Analysis:</h4>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getLinguisticBadge(result.linguistic_analysis.intensity)}`}>
+                    Tone Intensity: {result.linguistic_analysis.intensity}
+                  </span>
+                </div>
+                {result.linguistic_analysis.markers_found.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {result.linguistic_analysis.markers_found.map((marker, i) => (
+                      <span key={i} className="text-xs bg-white text-gray-600 px-2 py-1 rounded border border-gray-100 flex items-center gap-1 font-tamil">
+                        🔍 {marker}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 italic">No exaggerated linguistic markers detected.</p>
+                )}
               </div>
-              <div className="flex justify-between items-center">
-                <span>Confidence:</span>
-                <span className="font-bold">
-                  {(result.confidence * 100).toFixed(2)}%
-                </span>
+            )}
+
+            {/* Trigger Words / Key Phrases */}
+            {result.explanation && result.explanation.trigger_words.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700">Keyword/Phrase Highlights:</h4>
+                <div className="flex flex-wrap gap-2">
+                  {result.explanation.trigger_words.map((tw, idx) => (
+                    <div 
+                      key={idx} 
+                      className="px-3 py-1 bg-white border rounded-full text-sm flex items-center gap-2 shadow-sm"
+                      title={`Contribution: ${tw.contribution}`}
+                    >
+                      <span className="font-tamil">{tw.word}</span>
+                      <span className="text-[10px] bg-red-50 text-red-600 px-1 rounded font-mono">
+                        +{Math.round(tw.contribution * 100)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 italic">
+                  {result.explanation.summary}
+                </p>
               </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {result.original_text && (
-                <div>
-                  <span className="font-medium">Original Text:</span>
-                  <p className="text-sm text-gray-600 mt-1">{result.original_text}</p>
+                <div className="space-y-1">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Input Text:</span>
+                  <div className="p-3 bg-white/50 rounded border text-sm max-h-32 overflow-y-auto font-tamil">
+                    {result.original_text}
+                  </div>
                 </div>
               )}
               {result.cleaned_text && result.cleaned_text !== result.original_text && (
-                <div>
-                  <span className="font-medium">Cleaned Text:</span>
-                  <p className="text-sm text-gray-600 mt-1">{result.cleaned_text}</p>
+                <div className="space-y-1">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Analyzed (Tamil Only):</span>
+                  <div className="p-3 bg-white/50 rounded border text-sm max-h-32 overflow-y-auto font-tamil text-blue-800">
+                    {result.cleaned_text}
+                  </div>
                 </div>
               )}
             </div>
           </CardContent>
+          <CardFooter className="text-xs text-gray-400 border-t pt-4 flex justify-between">
+            <span>Detected Language: Tamil ({result.metadata?.language_detected})</span>
+            {result.metadata?.timestamp && <span>Analyzed on: {result.metadata.timestamp}</span>}
+          </CardFooter>
         </Card>
       )}
     </div>

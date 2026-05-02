@@ -54,6 +54,8 @@ const Prediction = () => {
   const [pastReal, setPastReal] = useState("0");
   const [domainAge, setDomainAge] = useState("0");
   const [followers, setFollowers] = useState("0");
+  const [mode, setMode] = useState("auto");
+  const [topK, setTopK] = useState(3);
   const [result, setResult] = useState<PredictionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   // Guard `useToast` in case the hook isn't available during rendering
@@ -80,6 +82,8 @@ const Prediction = () => {
         past_real: parseInt(pastReal || "0"),
         domain_age_years: parseFloat(domainAge || "0"),
         followers: parseInt(followers || "0"),
+        mode: mode,
+        top_k: topK,
       };
 
       const response = await fetch("http://127.0.0.1:5000/predict", {
@@ -177,6 +181,33 @@ const Prediction = () => {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm">Search Mode</label>
+              <select
+                className="w-full border rounded px-2 py-1"
+                value={mode}
+                onChange={(e) => setMode(e.target.value)}
+              >
+                <option value="auto">Auto (Smart)</option>
+                <option value="local">Local Only</option>
+                <option value="online">Online Search Only</option>
+                <option value="both">Both (Local + Online)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm">Top results</label>
+              <input
+                className="w-full border rounded px-2 py-1"
+                type="number"
+                min={1}
+                max={10}
+                value={topK}
+                onChange={(e) => setTopK(parseInt(e.target.value) || 1)}
+              />
+            </div>
+          </div>
+
           <Button onClick={handleSubmit} disabled={isLoading}>
             {isLoading ? "Analyzing..." : "Analyze"}
           </Button>
@@ -234,11 +265,11 @@ const Prediction = () => {
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-2">
                     Verdict:{" "}
-                    <Badge variant={result.similarity.final_verdict.toLowerCase().includes('true') ? 'default' : 'destructive'}>
-                      {result.similarity.final_verdict}
+                    <Badge variant={result.similarity.final_verdict?.toLowerCase().includes('true') || result.similarity.final_verdict?.toLowerCase().includes('real') ? 'default' : 'destructive'}>
+                      {result.similarity.final_verdict || "No match found"}
                     </Badge>
                   </div>
-                  {result.similarity.neighbors && result.similarity.neighbors.length > 0 && (
+                  {result.similarity.neighbors && result.similarity.neighbors.length > 0 ? (
                     <ul className="space-y-4">
                       {result.similarity.neighbors.map((match, index) => (
                         <li key={index} className="border-b pb-2 last:border-0">
@@ -262,6 +293,10 @@ const Prediction = () => {
                         </li>
                       ))}
                     </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">
+                      No matching records found in selected search mode.
+                    </p>
                   )}
                 </CardContent>
               </Card>

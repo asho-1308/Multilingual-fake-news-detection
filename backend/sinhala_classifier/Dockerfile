@@ -4,7 +4,7 @@ FROM multilingual-fake-news-detection-base:latest
 
 # Copy application code
 COPY app/ app/
-COPY model/ model/
+COPY models/ models/
 
 EXPOSE 2000
 

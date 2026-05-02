@@ -169,15 +169,16 @@ class SemanticVerifierService:
 
         best_sim = results[0]["similarity"] if results else 0.0
         
-        if best_sim > 0.8:
+        # Lowered threshold from 0.8 to 0.4 to provide more visible feedback
+        if best_sim > 0.4:
             top_verdict = results[0].get("verdict", "Unknown")
-            if any(x in top_verdict.lower() for x in ["true", "article", "real", "සත්‍ය"]):
+            if any(x in top_verdict.lower() for x in ["true", "article", "real", "සත්‍ය", "news"]):
                 return "VERIFIED REAL", round(best_sim, 4)
             if any(x in top_verdict.lower() for x in ["false", "fake", "fake news", "අසත්‍ය"]):
                 return "VERIFIED FAKE", round(best_sim, 4)
             return "MATCH FOUND", round(best_sim, 4)
 
-        if best_sim < 0.5:
+        if best_sim < 0.2:
             return "UNCERTAIN", 0.3
 
         # For middle-range similarities (0.5 to 0.8), count the verdicts
