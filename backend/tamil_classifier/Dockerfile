@@ -1,6 +1,10 @@
 # Use the common base image
 FROM multilingual-fake-news-detection-base:latest
 
+
+# Install tesseract-ocr and all language packs
+RUN apt-get update && apt-get install -y tesseract-ocr-all
+
 # Install local requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

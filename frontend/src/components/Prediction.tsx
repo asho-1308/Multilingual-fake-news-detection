@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SERVICE_ENDPOINTS } from "@/lib/serviceUrls";
 
 // Define the structure of the prediction results
 interface ClassifierResult {
@@ -86,7 +87,7 @@ const Prediction = () => {
         top_k: topK,
       };
 
-      const response = await fetch("http://127.0.0.1:5000/predict", {
+      const response = await fetch(SERVICE_ENDPOINTS.orchestratorPredict, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

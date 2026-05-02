@@ -1,3 +1,5 @@
+import { SERVICE_ENDPOINTS } from "@/lib/serviceUrls";
+
 export interface PredictionResult {
     original_text: string;
     cleaned_text: string;
@@ -12,7 +14,7 @@ export interface ApiError {
     message: string;
 }
 
-const API_BASE_URL = 'http://localhost:1000';
+const API_BASE_URL = SERVICE_ENDPOINTS.tamilPredict.replace(/\/predict$/, '');
 
 /**
  * Checks a single news headline.
@@ -21,7 +23,7 @@ const API_BASE_URL = 'http://localhost:1000';
  */
 export async function checkSingleNews(text: string): Promise<PredictionResult | ApiError> {
     try {
-        const response = await fetch(`${API_BASE_URL}/predict`, {
+        const response = await fetch(SERVICE_ENDPOINTS.tamilPredict, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text }),
@@ -74,7 +76,7 @@ export async function checkImageUpload(file: File): Promise<PredictionResult | A
         const form = new FormData();
         form.append('file', file);
 
-        const response = await fetch(`${API_BASE_URL}/predict_image_upload`, {
+        const response = await fetch(SERVICE_ENDPOINTS.tamilImageUpload, {
             method: 'POST',
             body: form,
         });
@@ -97,7 +99,7 @@ export async function checkImageUpload(file: File): Promise<PredictionResult | A
  */
 export async function checkImageURL(url: string): Promise<PredictionResult | ApiError> {
     try {
-        const response = await fetch(`${API_BASE_URL}/predict_image_url`, {
+        const response = await fetch(SERVICE_ENDPOINTS.tamilImageUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url }),
