@@ -9,7 +9,12 @@ import time
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from transformers import pipeline
-from transformers_interpret import SequenceClassificationExplainer
+try:
+    from transformers_interpret import SequenceClassificationExplainer
+    HAS_EXPLAINER = True
+except ImportError:
+    HAS_EXPLAINER = False
+    print("Warning: transformers_interpret not available. Explanations will be disabled.")
 from indicnlp import common
 from indicnlp.normalize.indic_normalize import IndicNormalizerFactory
 from contextlib import asynccontextmanager
@@ -64,9 +69,13 @@ def load_model_and_resources():
         print("   Fake News Model Loaded Successfully.")
         
         # 3. Initialize Model Explainer
-        print("3. Initializing Model Explainer...")
-        explainer = SequenceClassificationExplainer(classifier.model, classifier.tokenizer)
-        print("   Explainer Initialized Successfully.")
+        if HAS_EXPLAINER:
+            print("3. Initializing Model Explainer...")
+            explainer = SequenceClassificationExplainer(classifier.model, classifier.tokenizer)
+            print("   Explainer Initialized Successfully.")
+        else:
+            print("3. Skipping Model Explainer (transformers_interpret not available)...")
+            explainer = None
         
     except Exception as e:
         print(f"   CRITICAL ERROR: Could not load model or explainer. {e}")

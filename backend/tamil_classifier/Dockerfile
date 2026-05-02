@@ -1,7 +1,9 @@
 # Use the common base image
 FROM multilingual-fake-news-detection-base:latest
 
-# All dependencies are already installed in the base image
+# Install local requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
