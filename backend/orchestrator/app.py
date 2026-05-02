@@ -277,7 +277,7 @@ def predict():
             "top_k": data.get("top_k", 3),
             "mode": data.get("mode", "auto")
         }
-        resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json=sim_payload, timeout=30)
+        resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json=sim_payload, timeout=90)
         debug_info['similarity_status'] = resp.status_code
         try:
             debug_info['similarity_text'] = resp.text
