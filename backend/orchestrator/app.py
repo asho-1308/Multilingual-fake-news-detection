@@ -271,7 +271,13 @@ def predict():
     try:
         print(f"DEBUG: Calling Similarity Matcher at {SIMILARITY_MATCHER_URL}", flush=True)
         sys.stdout.flush()
-        resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json={"claim": text}, timeout=30)
+        # Pass top_k and mode if provided by the client, defaulting to auto/3
+        sim_payload = {
+            "claim": text,
+            "top_k": data.get("top_k", 3),
+            "mode": data.get("mode", "auto")
+        }
+        resp = requests.post(f"{SIMILARITY_MATCHER_URL}/api/verify", json=sim_payload, timeout=30)
         debug_info['similarity_status'] = resp.status_code
         try:
             debug_info['similarity_text'] = resp.text
@@ -281,7 +287,11 @@ def predict():
         sys.stdout.flush()
         if resp.status_code == 200:
             similarity_result = resp.json()
-            print(f"DEBUG: Similarity result: {similarity_result}", flush=True)
+            print(f"DEBUG: Similarity result keys: {list(similarity_result.keys()) if similarity_result else 'None'}", flush=True)
+            # Ensure neighbors is always a list even if API returns it differently
+            if similarity_result and 'neighbors' not in similarity_result and 'similar_sources' in similarity_result:
+                similarity_result['neighbors'] = similarity_result['similar_sources']
+            print(f"DEBUG: Similarity neighbors found: {len(similarity_result.get('neighbors', [])) if similarity_result else 0}", flush=True)
     except Exception as e:
         print(f"DEBUG: Exception calling similarity matcher: {e}", flush=True)
         sys.stdout.flush()
@@ -342,15 +352,22 @@ def predict():
             # Find the match with the highest similarity
             best_match = max(neighbors, key=lambda x: x['similarity']) if neighbors else None
             
-            if best_match and best_match['similarity'] > 0.1:
+            if best_match:
                 s_conf = float(best_match['similarity'])
                 s_verdict = str(best_match.get('verdict', '')).lower()
                 
                 # If we found an actual news article or a verified TRUE source, it is REAL
                 is_s_fake = any(x in s_verdict for x in ['fake', 'false', 'අසත්‍ය'])
                 
-                # Boost weight for 100% matches to ensure they dominate the result
-                s_weight = 2.0 if s_conf > 0.9 else 1.2
+                # Boost weight for similarity matches. 
+                # Even lower similarity from online search is a valid signal.
+                if s_conf > 0.8:
+                    s_weight = 2.0
+                elif s_conf > 0.4:
+                    s_weight = 1.5
+                else:
+                    s_weight = 1.0
+                    
                 signals.append({'is_fake': is_s_fake, 'conf': s_conf, 'weight': s_weight, 'source': 'similarity_max'})
 
         # 3. Credibility Signal (Supporting)
