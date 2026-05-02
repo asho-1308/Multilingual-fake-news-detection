@@ -265,7 +265,7 @@ const Prediction = () => {
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-2">
                     Verdict:{" "}
-                    <Badge variant={result.similarity.final_verdict?.toLowerCase().includes('true') || result.similarity.final_verdict?.toLowerCase().includes('real') ? 'default' : 'destructive'}>
+                    <Badge variant={result.similarity.final_verdict?.toLowerCase().includes('true') || result.similarity.final_verdict?.toLowerCase().includes('real') ? 'secondary' : 'destructive'}>
                       {result.similarity.final_verdict || "No match found"}
                     </Badge>
                   </div>
@@ -278,14 +278,18 @@ const Prediction = () => {
                           </p>
                           <p className="text-sm">
                             <strong>Claim:</strong>{" "}
-                            <a
-                              href={match.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-500 hover:underline"
-                            >
-                              {match.claim}
-                            </a>
+                            {match.url ? (
+                              <a
+                                href={match.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-500 hover:underline"
+                              >
+                                {match.claim}
+                              </a>
+                            ) : (
+                              match.claim
+                            )}
                           </p>
                           <p className="text-sm italic">
                             Verdict: {match.verdict} ({(match.similarity * 100).toFixed(1)}% similarity)
