@@ -3,8 +3,10 @@ FROM multilingual-fake-news-detection-base:latest
 
 # All dependencies are already installed in the base image
 
-# Copy application code
-COPY . .
+# Copy only runtime files and model artifacts
+COPY app.py semantic_model.py ./
+COPY artifacts/ artifacts/
+COPY models/ models/
 
 # Expose port 3000
 EXPOSE 3000

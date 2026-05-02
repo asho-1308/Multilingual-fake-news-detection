@@ -3,8 +3,10 @@ FROM multilingual-fake-news-detection-base:latest
 
 # All dependencies are already installed in the base image
 
-# Copy application code
-COPY . .
+# Copy only runtime app and model files
+COPY app.py ./
+COPY credibility_rf_model.pkl ./
+COPY lang_encoder.pkl ./
 
 # Expose port 4000
 EXPOSE 4000

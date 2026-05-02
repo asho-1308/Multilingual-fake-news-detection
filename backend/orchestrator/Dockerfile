@@ -4,8 +4,8 @@ FROM multilingual-fake-news-detection-base:latest
 # Install additional dependencies specific to orchestrator
 RUN pip install --no-cache-dir langdetect==1.0.9
 
-# Copy application code
-COPY . .
+# Copy only runtime entrypoint
+COPY app.py ./
 
 # Expose port 5000
 EXPOSE 5000

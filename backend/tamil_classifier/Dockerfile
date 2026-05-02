@@ -1,16 +1,16 @@
 # Use the common base image
 FROM multilingual-fake-news-detection-base:latest
 
-
-# Install tesseract-ocr and all language packs
-RUN apt-get update && apt-get install -y tesseract-ocr-all
-
 # Install local requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy only runtime app and model assets
+COPY main.py ./
+COPY my_tamil_fake_news_model/ my_tamil_fake_news_model/
+COPY final_trained_model/ final_trained_model/
+COPY indic_nlp_resources/ indic_nlp_resources/
+COPY tessdata/ tessdata/
 
 # Copy the Tesseract language data file
 COPY tessdata/tam.traineddata /usr/share/tesseract-ocr/4.00/tessdata/tam.traineddata

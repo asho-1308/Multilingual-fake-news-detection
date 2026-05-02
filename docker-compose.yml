@@ -1,4 +1,28 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_ORCHESTRATOR_URL: ${VITE_ORCHESTRATOR_URL:-http://127.0.0.1:5000}
+        VITE_TAMIL_URL: ${VITE_TAMIL_URL:-http://127.0.0.1:1000}
+        VITE_SINHALA_URL: ${VITE_SINHALA_URL:-http://127.0.0.1:2000}
+        VITE_SIMILARITY_URL: ${VITE_SIMILARITY_URL:-http://127.0.0.1:3000}
+        VITE_CREDIBILITY_URL: ${VITE_CREDIBILITY_URL:-http://127.0.0.1:4000}
+    container_name: frontend-service
+    ports:
+      - "8080:80"
+    depends_on:
+      - orchestrator
+    restart: unless-stopped
+    networks:
+      - fake-news-detection
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   tamil-classifier:
     build:
       context: ./backend/tamil_classifier

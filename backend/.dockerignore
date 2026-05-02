@@ -1,0 +1,34 @@
+# VCS and editor metadata
+.git
+.gitignore
+.vscode/
+.idea/
+
+# Python caches and virtual environments
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/
+**/env/
+
+# Logs and temporary files
+**/logs/
+**/*.log
+**/*.tmp
+**/*.swp
+
+# Notebook and research artifacts
+../notebooks/
+**/.ipynb_checkpoints/
+**/*.ipynb
+
+# Large service sources are not required for the shared base image build
+credibility_predictor/
+orchestrator/
+similarity_matcher/
+sinhala_classifier/
+tamil_classifier/
+models/

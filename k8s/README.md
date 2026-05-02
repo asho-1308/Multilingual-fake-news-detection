@@ -9,6 +9,7 @@ This guide explains how to build Docker images and deploy the backend services u
 - **similarity-matcher**: Runs on port 3000
 - **credibility-predictor**: Runs on port 4000
 - **orchestrator**: Runs on port 5000
+- **frontend**: Runs on port 80 inside the container and is typically exposed through Ingress or port-forwarding
 
 ## Building Docker Images
 
@@ -29,6 +30,15 @@ docker build -t credibility-predictor:latest ./backend/credibility_predictor
 
 # Build Orchestrator
 docker build -t orchestrator:latest ./backend/orchestrator
+
+# Build Frontend (replace URLs with your public deployment endpoints)
+docker build \
+	--build-arg VITE_ORCHESTRATOR_URL=https://api.example.com \
+	--build-arg VITE_TAMIL_URL=https://api.example.com \
+	--build-arg VITE_SINHALA_URL=https://api.example.com \
+	--build-arg VITE_SIMILARITY_URL=https://api.example.com \
+	--build-arg VITE_CREDIBILITY_URL=https://api.example.com \
+	-t frontend:latest ./frontend
 ```
 
 ## Running with Docker Compose
@@ -62,6 +72,7 @@ kubectl apply -f k8s/sinhala-classifier.yaml
 kubectl apply -f k8s/similarity-matcher.yaml
 kubectl apply -f k8s/credibility-predictor.yaml
 kubectl apply -f k8s/orchestrator.yaml
+kubectl apply -f k8s/frontend.yaml
 ```
 
 ### Check Deployment
@@ -73,9 +84,10 @@ kubectl get services
 
 ### Access Services
 
-The services are exposed as ClusterIP. To access them externally, you may need to create Ingress or use port-forwarding:
+The backend services are exposed as ClusterIP. To access them externally, you may need to create Ingress or use port-forwarding. The frontend is usually the public entrypoint:
 
 ```bash
+kubectl port-forward svc/frontend-service 8080:80
 kubectl port-forward svc/tamil-classifier-service 1000:1000
 kubectl port-forward svc/sinhala-classifier-service 2000:2000
 kubectl port-forward svc/similarity-matcher-service 3000:3000
@@ -86,3 +98,12 @@ kubectl port-forward svc/orchestrator-service 5000:5000
 ## Orchestrator
 
 The orchestrator service is the main API that coordinates calls to the individual classifiers and predictors. It detects the language of the input text and routes it to the appropriate classifier, then checks for similarity and credibility. When the orchestrator runs, all microservices are available and running.
+
+## Frontend Deployment Notes
+
+The frontend is a Vite static build, so the API URLs are embedded at build time. For production deployments you should:
+
+1. Build the frontend image with the production API URLs.
+2. Publish the image to a registry.
+3. Deploy the frontend alongside the backend services.
+4. Put Ingress, a load balancer, or a reverse proxy in front of the frontend and API if you want a public URL.
