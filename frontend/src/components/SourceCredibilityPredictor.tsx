@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Shield, Loader2 } from "lucide-react";
+import { SERVICE_ENDPOINTS } from "@/lib/serviceUrls";
 
 interface CredibilityResult {
   credibility_score: number;
@@ -44,7 +45,7 @@ const SourceCredibilityPredictor = () => {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:4000/predict", {
+      const response = await fetch(SERVICE_ENDPOINTS.credibilityPredict, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

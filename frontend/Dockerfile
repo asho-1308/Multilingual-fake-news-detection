@@ -1,0 +1,31 @@
+FROM node:20-alpine AS build
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+ARG VITE_ORCHESTRATOR_URL=http://127.0.0.1:5000
+ARG VITE_TAMIL_URL=http://127.0.0.1:1000
+ARG VITE_SINHALA_URL=http://127.0.0.1:2000
+ARG VITE_SIMILARITY_URL=http://127.0.0.1:3000
+ARG VITE_CREDIBILITY_URL=http://127.0.0.1:4000
+
+ENV VITE_ORCHESTRATOR_URL=${VITE_ORCHESTRATOR_URL}
+ENV VITE_TAMIL_URL=${VITE_TAMIL_URL}
+ENV VITE_SINHALA_URL=${VITE_SINHALA_URL}
+ENV VITE_SIMILARITY_URL=${VITE_SIMILARITY_URL}
+ENV VITE_CREDIBILITY_URL=${VITE_CREDIBILITY_URL}
+
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

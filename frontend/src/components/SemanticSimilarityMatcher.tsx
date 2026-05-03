@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search, Loader2, ExternalLink } from "lucide-react";
+import { SERVICE_ENDPOINTS } from "@/lib/serviceUrls";
 
 interface SimilarityResult {
   claim: string;
@@ -39,11 +40,8 @@ const SemanticSimilarityMatcher = () => {
     try {
       // Debug: log outgoing payload
       console.log("[SM] Sending similarity request", { claim, top_k: topK, mode });
-      // The Similarity Matcher service runs on port 3000 by default,
-      // allow overriding via Vite env var `VITE_SIMILARITY_URL`.
-      const similarityUrl = import.meta.env.VITE_SIMILARITY_URL ?? "http://127.0.0.1:3000/api/verify";
-      console.log("[SM] Using similarity endpoint:", similarityUrl);
-      const response = await fetch(similarityUrl, {
+      console.log("[SM] Using similarity endpoint:", SERVICE_ENDPOINTS.similarityVerify);
+      const response = await fetch(SERVICE_ENDPOINTS.similarityVerify, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

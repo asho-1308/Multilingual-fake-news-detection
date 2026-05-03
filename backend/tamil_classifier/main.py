@@ -9,7 +9,12 @@ import time
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from transformers import pipeline
-from transformers_interpret import SequenceClassificationExplainer
+try:
+    from transformers_interpret import SequenceClassificationExplainer
+    HAS_EXPLAINER = True
+except ImportError:
+    HAS_EXPLAINER = False
+    print("Warning: transformers_interpret not available. Explanations will be disabled.")
 from indicnlp import common
 from indicnlp.normalize.indic_normalize import IndicNormalizerFactory
 from contextlib import asynccontextmanager
@@ -64,9 +69,13 @@ def load_model_and_resources():
         print("   Fake News Model Loaded Successfully.")
         
         # 3. Initialize Model Explainer
-        print("3. Initializing Model Explainer...")
-        explainer = SequenceClassificationExplainer(classifier.model, classifier.tokenizer)
-        print("   Explainer Initialized Successfully.")
+        if HAS_EXPLAINER:
+            print("3. Initializing Model Explainer...")
+            explainer = SequenceClassificationExplainer(classifier.model, classifier.tokenizer)
+            print("   Explainer Initialized Successfully.")
+        else:
+            print("3. Skipping Model Explainer (transformers_interpret not available)...")
+            explainer = None
         
     except Exception as e:
         print(f"   CRITICAL ERROR: Could not load model or explainer. {e}")
@@ -156,12 +165,21 @@ def preprocess_for_tesseract(image: Image.Image):
 
 def perform_ocr(image: Image.Image):
     try:
+        # Print image info
+        print(f"--- OCR: Image info ---\nMode: {image.mode}, Size: {image.size}, Type: {type(image)}")
+        # Print available tessdata files
+        import os
+        tessdata_dir = '/usr/share/tesseract-ocr/4.00/tessdata/'
+        if os.path.exists(tessdata_dir):
+            print(f"--- OCR: Available tessdata files ---\n{os.listdir(tessdata_dir)}")
+        else:
+            print(f"--- OCR: tessdata dir not found: {tessdata_dir}")
         processed_img = preprocess_for_tesseract(image)
         print("--- OCR: Extracting Text with Tesseract (Data Mode) ---")
-        
         # Use image_to_data to get bounding boxes and confidence
         # This helps us identify the "headline" by looking at the height of text blocks
         data = pytesseract.image_to_data(processed_img, lang='tam+eng', output_type=pytesseract.Output.DICT)
+        print(f"--- OCR: Raw data output ---\n{data}")
         
         n_boxes = len(data['text'])
         blocks = {} # block_num -> list of words
@@ -188,6 +206,7 @@ def perform_ocr(image: Image.Image):
             # Fallback to standard string if data mode fails to find Tamil
             custom_config = r'-l tam+eng --psm 3'
             text = pytesseract.image_to_string(processed_img, config=custom_config)
+            print(f"--- OCR: Raw string output ---\n{text}")
             lines = [l.strip() for l in text.splitlines() if l.strip() and re.search(r'[\u0B80-\u0BFF]', l)]
             return lines[0] if lines else ""
 

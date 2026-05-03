@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FileText, Loader2 } from "lucide-react";
+import { SERVICE_ENDPOINTS } from "@/lib/serviceUrls";
 
 interface PredictionResult {
   label: string;
@@ -23,7 +24,7 @@ const SinhalaFakeNewsDetector = () => {
     setError("");
 
     try {
-      const response = await fetch("http://127.0.0.1:2000/predict", {
+      const response = await fetch(SERVICE_ENDPOINTS.sinhalaPredict, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

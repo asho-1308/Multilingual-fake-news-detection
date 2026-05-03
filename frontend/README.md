@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This frontend is a Vite + React application that talks to the backend microservices through environment-based service URLs.
 
-## Getting Started
-
-First, run the development server:
+## Local Development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+By default the app expects the backend services to be available on localhost:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Orchestrator: http://127.0.0.1:5000
+- Tamil classifier: http://127.0.0.1:1000
+- Sinhala classifier: http://127.0.0.1:2000
+- Similarity matcher: http://127.0.0.1:3000
+- Credibility predictor: http://127.0.0.1:4000
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Production Build
 
-## Learn More
+The API URLs are baked into the static build, so set them before running npm run build:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+VITE_ORCHESTRATOR_URL=https://api.example.com \
+VITE_TAMIL_URL=https://api.example.com \
+VITE_SINHALA_URL=https://api.example.com \
+VITE_SIMILARITY_URL=https://api.example.com \
+VITE_CREDIBILITY_URL=https://api.example.com \
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Docker
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The repository includes a multi-stage Dockerfile that builds the app and serves it with Nginx.
 
-## Deploy on Vercel
+Example:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+docker build \
+	--build-arg VITE_ORCHESTRATOR_URL=https://api.example.com \
+	--build-arg VITE_TAMIL_URL=https://api.example.com \
+	--build-arg VITE_SINHALA_URL=https://api.example.com \
+	--build-arg VITE_SIMILARITY_URL=https://api.example.com \
+	--build-arg VITE_CREDIBILITY_URL=https://api.example.com \
+	-t multilingual-fake-news-frontend ./frontend
+```

@@ -1,0 +1,20 @@
+# Keep only runtime application and model assets
+*
+!app/
+!app/**
+!models/
+!models/**
+!Dockerfile
+
+# Common exclusions (redundant but explicit)
+.git
+.vscode/
+.idea/
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.log
+*.ipynb
+.ipynb_checkpoints/

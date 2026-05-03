@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Multilingual Fake News Detector",
   "version": "0.1.0",
-  "description": "Scans H1/H2 headings (Tamil/Sinhala) and shows credibility using local orchestrator.",
+  "description": "Scans H1/H2 headings (Tamil/Sinhala) and shows classifier predictions only.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -10,7 +10,9 @@
   ],
   "host_permissions": [
     "http://localhost/*",
-    "https://localhost/*"
+    "https://localhost/*",
+    "http://127.0.0.1/*",
+    "https://127.0.0.1/*"
   ],
   "action": {
     "default_title": "Scan Headings",

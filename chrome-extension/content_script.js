@@ -2,6 +2,8 @@
   // Unicode checks for Tamil and Sinhala
   const isTamil = (s) => /[\u0B80-\u0BFF]/.test(s);
   const isSinhala = (s) => /[\u0D80-\u0DFF]/.test(s);
+  const TAMIL_CLASSIFIER_URL = 'http://127.0.0.1:1000/predict';
+  const SINHALA_CLASSIFIER_URL = 'http://127.0.0.1:2000/predict';
   const CANDIDATE_SELECTOR = 'h1,h2,h3,h4,h5,h6,[role="heading"],[class*="headline" i],[class*="title" i],[id*="headline" i],[id*="title" i],.article-title,.entry-title';
 
   // Create overlay element near an element
@@ -88,6 +90,16 @@
     };
 
     const sendText = sanitizeForBackend(text);
+    const tamilText = isTamil(sendText || text);
+    const sinhalaText = isSinhala(sendText || text);
+
+    if (!tamilText && !sinhalaText) {
+      showOverlay(el, `
+        <div class="fnd-title">Language Not Supported</div>
+        <div style="font-size:12px; color:#64748b; font-weight:500;">Only Tamil and Sinhala headings are analyzed.</div>
+      `);
+      return;
+    }
 
     showOverlay(el, `
       <div class="fnd-loader">
@@ -97,66 +109,70 @@
     `);
 
     try {
-      const resp = await fetch('http://127.0.0.1:5000/predict_light', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: sendText || text })
-      });
-      if (!resp.ok) throw new Error(`Status ${resp.status}`);
-      const data = await resp.json();
-      console.log('DEBUG: Extension received data:', data);
+      const endpoint = tamilText ? TAMIL_CLASSIFIER_URL : SINHALA_CLASSIFIER_URL;
+      const port = tamilText ? '1000' : '2000';
+      const lang = tamilText ? 'Tamil' : 'Sinhala';
       
-      const pred = data.final_prediction || 'Unknown';
-      const isFake = pred.toLowerCase() === 'fake';
-      const isReal = pred.toLowerCase() === 'real';
-      const colorClass = isFake ? 'fnd-fake' : (isReal ? 'fnd-real' : '');
-      const confValue = data.final_confidence != null ? (data.final_confidence * 100).toFixed(0) : '0';
-      
-      const details = [];
-      const hasNeighbors = data.similarity && data.similarity.neighbors && Array.isArray(data.similarity.neighbors) && data.similarity.neighbors.length > 0;
-      
-      console.log('DEBUG: hasNeighbors?', hasNeighbors, 'neighbors count:', data.similarity?.neighbors?.length);
-
-      if (hasNeighbors) {
-        // Collect all neighbors to display
-        data.similarity.neighbors.forEach((neighbor, idx) => {
-          const rawSim = parseFloat(neighbor.similarity);
-          const simPercent = (!isNaN(rawSim) ? (rawSim * 100).toFixed(1) : "0.0");
-          const sourceName = neighbor.source || 'Unknown Source';
-          const newsLink = neighbor.url || '#';
-          const isOnlineLabel = neighbor.is_online ? ' <span style="color:#ef4444; font-size:9px;">(Live)</span>' : '';
-          const verdictText = neighbor.verdict || 'Article';
+      // Retry logic with exponential backoff
+      let lastErr = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`DEBUG: Attempt ${attempt}/3 - Fetching from ${endpoint}`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 60000);
           
-          details.push(`
-            <div class="fnd-detail-item" style="margin-bottom: 8px; border-left: 2px solid #e2e8f0; padding-left: 6px;">
-              <span class="fnd-detail-icon">🔗</span>
-              <div>
-                <div style="font-weight: 700; font-size: 11px;">${simPercent}% Match: ${sourceName}${isOnlineLabel}</div>
-                <div style="font-size: 10px; color: #64748b; margin-top: 1px;">Verdict: ${verdictText}</div>
-                <a href="${newsLink}" target="_blank" style="color: #2563eb; font-size: 11px; text-decoration: underline;">Read Original Article</a>
-              </div>
-            </div>
-          `);
-        });
-      } else if (data.similarity && data.similarity.final_verdict && data.similarity.final_verdict !== "No Match" && data.similarity.final_verdict !== "UNCERTAIN") {
-        details.push(`<div class="fnd-detail-item"><span class="fnd-detail-icon">🔍</span><span><strong>Similarity:</strong> ${data.similarity.final_verdict}</span></div>`);
-      }
+          const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: sendText || text }),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          console.log('DEBUG: Extension received data:', data);
 
-      const content = `
-        <div class="fnd-title">Verification Results</div>
-        <div class="fnd-result">
-          <div class="fnd-prediction ${colorClass}">${pred}</div>
-          <div class="fnd-confidence">${confValue}% Final Confidence</div>
-        </div>
-        ${details.length > 0 ? `<div class="fnd-details">${details.join('')}</div>` : '<div style="font-size:11px; color:#64748b; font-style:italic; margin-top:8px">No matching news found in record</div>'}
-      `;
-      
-      showOverlay(el, content);
+          const pred = (data.prediction || data.label || 'Unknown').toString();
+          const normalizedPred = pred.toLowerCase();
+          const isFake = normalizedPred.includes('fake');
+          const isReal = normalizedPred.includes('real') || normalizedPred.includes('credible');
+          const colorClass = isFake ? 'fnd-fake' : (isReal ? 'fnd-real' : '');
+          const confidenceValue = data.confidence != null ? data.confidence : 0;
+          const confValue = (confidenceValue * 100).toFixed(0);
+
+          const content = `
+            <div class="fnd-title">Language-Specific Result</div>
+            <div class="fnd-result">
+              <div class="fnd-prediction ${colorClass}">${pred}</div>
+              <div class="fnd-confidence">${confValue}% Final Confidence</div>
+            </div>
+            <div style="font-size:11px; color:#64748b; margin-top:8px">Used only the ${lang} classifier.</div>
+          `;
+          
+          showOverlay(el, content);
+          return; // Success!
+        } catch (err) {
+          lastErr = err;
+          console.log(`DEBUG: Attempt ${attempt}/3 failed:`, err.message);
+          if (attempt < 3) {
+            await new Promise(r => setTimeout(r, Math.pow(2, attempt - 1) * 500)); // Backoff
+          }
+        }
+      }
+      throw lastErr || new Error('All retry attempts failed');
     } catch (err) {
+      const port = tamilText ? '1000' : '2000';
+      const lang = tamilText ? 'Tamil' : 'Sinhala';
+      console.error('DEBUG: Final error:', err);
+      console.error('DEBUG: Error message:', err?.message);
+      console.error('DEBUG: Error name:', err?.name);
       showOverlay(el, `
         <div class="fnd-title">Service Error</div>
         <div style="font-size:12px; color:#ef4444; font-weight:500;">Connection failed to local backend</div>
-        <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Ensure orchestrator is running on port 5000</div>
+        <div style="font-size:11px; color:#94a3b8; margin-top:4px;">Ensure ${lang} classifier is running on port ${port}</div>
+        <div style="font-size:10px; color:#cbd5e1; margin-top:4px; font-family: monospace;">Debug: ${err?.message || 'Unknown error'}</div>
       `);
     }
   }
@@ -169,11 +185,21 @@
       if (!t || t.length < 4) return false;
       // ONLY analyze if the text contains Tamil or Sinhala characters
       if (isTamil(t) || isSinhala(t)) return true;
-      return false; // Skip all other languages (English, etc.)
+      return false; // Skip all other languages
     });
 
     const texts = candidates.map(e => (e.innerText || '').trim());
-    candidates.forEach(el => analyzeHeading(el, (el.innerText || '').trim()));
+
+    // SEQUENTIAL EXECUTION: Wait for each heading to finish before starting the next
+    for (const el of candidates) {
+      const headingText = (el.innerText || '').trim();
+      try {
+        await analyzeHeading(el, headingText);
+      } catch (err) {
+        console.error('Error analyzing heading sequentially:', err);
+      }
+    }
+
     return { scanned: true, count: candidates.length, samples: texts.slice(0, 20) };
   }
 

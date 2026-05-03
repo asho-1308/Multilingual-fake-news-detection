@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
+import { SERVICE_ENDPOINTS } from "@/lib/serviceUrls";
 
 interface PredictionResult {
   status?: string;
@@ -49,7 +50,7 @@ const TamilFakeNewsDetector = () => {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:1000/predict", {
+      const response = await fetch(SERVICE_ENDPOINTS.tamilPredict, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -92,7 +93,7 @@ const TamilFakeNewsDetector = () => {
       const formData = new FormData();
       formData.append("file", imageFile);
 
-      const response = await fetch("http://localhost:1000/predict_image_upload", {
+      const response = await fetch(SERVICE_ENDPOINTS.tamilImageUpload, {
         method: "POST",
         body: formData,
       });
@@ -130,7 +131,7 @@ const TamilFakeNewsDetector = () => {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:1000/predict_image_url", {
+      const response = await fetch(SERVICE_ENDPOINTS.tamilImageUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
